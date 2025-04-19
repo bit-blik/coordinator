@@ -11,3 +11,5 @@
 - backup of keys
 - re-generate new keys
 - other options except simplex (element/webpushs/telegram bot?)
+
+- refactor to use websockets / nostr
