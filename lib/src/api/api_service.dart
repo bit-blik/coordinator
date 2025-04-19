@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import '../services/coordinator_service.dart';
-import '../models/offer.dart'; // Import Offer model for status enum and toJson
+// Import Offer model for status enum and toJson
 
 class ApiService {
   final CoordinatorService _coordinatorService;

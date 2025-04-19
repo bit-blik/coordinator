@@ -9,7 +9,7 @@ import 'dart:convert'; // For jsonDecode
 import 'package:http/http.dart' as http; // For LNURL HTTP requests
 // Import LND generated types
 import '../generated/lnd/lightning.pb.dart'; // Contains Invoice and Invoice_InvoiceState
-import '../generated/lnd/router.pb.dart'; // Contains Payment and Payment_PaymentStatus
+// Contains Payment and Payment_PaymentStatus
 import 'dart:async'; // For StreamSubscription, Timer
 import 'package:process_run/process_run.dart';
 

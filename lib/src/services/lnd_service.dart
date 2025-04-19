@@ -1,8 +1,7 @@
 // For hex encoding
 import 'dart:io';
 import 'package:grpc/grpc.dart';
-import 'package:path/path.dart'
-    as p; // Add path dependency if not already there
+// Add path dependency if not already there
 import 'package:fixnum/fixnum.dart'; // Import fixnum for Int64
 
 // Import generated LND gRPC files (adjust paths/names if necessary)
@@ -11,13 +10,12 @@ import '../generated/lnd/invoices.pbgrpc.dart';
 import '../generated/lnd/router.pbgrpc.dart';
 // Removed unnecessary import: ../generated/lnd/router.pb.dart
 
-// TODO: Load connection details securely (e.g., from environment variables)
-final _lndHost = ''; // Replace with your LND host
-final _lndPort = 10009; // Replace with your LND gRPC port
-// Load cert and macaroon from the current application directory
-// Ensure 'tls.cert' and 'admin.macaroon' are present here
-final _tlsCertPath = 'tls.cert'; // Path relative to the application root
-final _macaroonPath = 'admin.macaroon'; // Path relative to the application root
+// Replace the hardcoded connection details with environment variables
+final _lndHost = Platform.environment['LND_HOST'] ?? 'localhost';
+final _lndPort = int.parse(Platform.environment['LND_PORT'] ?? '10009');
+final _tlsCertPath = Platform.environment['LND_CERT_PATH'] ?? 'tls.cert';
+final _macaroonPath =
+    Platform.environment['LND_MACAROON_PATH'] ?? 'admin.macaroon';
 
 class LndService {
   ClientChannel? _channel;
