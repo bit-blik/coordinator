@@ -1,6 +1,6 @@
 - if status is takerPaymentFailed, show the offer in main screen with button redeem by submiting a bolt11 invoice
 - paste on web
-- why it doesn't work well on mobile browsersw
+- why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
 - enter amount in PLN
 - show details of invoice to pay (amount in sats + fees)
 - fix entering ln address before entering the offers list
@@ -10,4 +10,4 @@
 
 - backup of keys
 - re-generate new keys
-- other options except simplex (element?)
+- other options except simplex (element/webpushs/telegram bot?)
