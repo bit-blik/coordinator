@@ -1,0 +1,62 @@
+import 'package:uuid/uuid.dart';
+
+enum OfferStatus {
+  created, // Initial state, invoice generated but not paid
+  funded, // Hold invoice paid by maker, offer listed
+  published, // (Optional) Offer announced via Nostr/other
+  reserved, // Taker has expressed interest, 15s timer started
+  blikReceived, // Taker submitted BLIK, 120s timer started
+  blikSentToMaker, // Maker requested BLIK code
+  makerConfirmed, // Maker confirmed BLIK payment success
+  settled, // Hold invoice settled by coordinator
+  takerPaid, // Taker successfully paid via LNURL-pay
+  expired, // Offer timed out (e.g., reservation, BLIK confirmation)
+  cancelled, // Offer explicitly cancelled by Maker while in 'funded' state
+  failed, // Irrecoverable error during the process
+  takerPaymentFailed, // Settled, but LNURL payment to taker failed
+}
+
+class Offer {
+  final String id;
+  final int amountSats;
+  final int feeSats;
+  final String makerPubkey;
+  final String holdInvoicePaymentHash;
+  final String holdInvoicePreimage; // Store preimage for settling
+  OfferStatus status;
+  DateTime createdAt;
+  DateTime? updatedAt;
+  String? takerPubkey;
+  DateTime? reservedAt; // Timestamp when offer was reserved
+  String? blikCode; // Store the submitted BLIK code
+  DateTime? blikReceivedAt; // Timestamp when BLIK was received
+  String? takerLightningAddress; // Store taker's LN address
+  String? takerInvoice; // Store the invoice generated from LNURL-pay
+  DateTime? makerConfirmedAt; // Timestamp when maker confirmed payment
+  DateTime? settledAt; // Timestamp when hold invoice was settled
+  DateTime? takerPaidAt; // Timestamp when taker was paid
+
+  Offer({
+    String? id,
+    required this.amountSats,
+    required this.feeSats,
+    required this.makerPubkey,
+    required this.holdInvoicePaymentHash,
+    required this.holdInvoicePreimage,
+    this.status = OfferStatus.created,
+    DateTime? createdAt,
+    this.updatedAt,
+    this.takerPubkey,
+    this.reservedAt,
+    this.blikCode,
+    this.blikReceivedAt,
+    this.takerLightningAddress,
+    this.takerInvoice,
+    this.makerConfirmedAt,
+    this.settledAt,
+    this.takerPaidAt,
+  })  : id = id ?? Uuid().v4(),
+        createdAt = createdAt ?? DateTime.now().toUtc();
+
+  // Add methods for serialization/deserialization if needed
+}

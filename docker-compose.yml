@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16 # Use a specific version tag, e.g., postgres:16
+    container_name: bitblik_postgres_db
+    environment:
+      POSTGRES_USER: user # Replace with your desired username
+      POSTGRES_PASSWORD: password # Replace with a strong password
+      POSTGRES_DB: bitblik_db # Replace with your desired database name
+    ports:
+      - "5434:5432" # Map container port 5432 to host port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persist data
+
+#  coordinator:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: coordinator
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+#    depends_on:
+#      - postgres
+#    environment:
+#      DATABASE_URL: postgresql://user:password@postgres:5432/bitblik_db
+#    volumes:
+#      - /root/.lnd/tls.cert:/app/tls.cert:ro
+#      - /root/.lnd/data/chain/bitcoin/mainnet/admin.macaroon:/app/admin.macaroon:ro
+#    ports:
+#      - "8686:8080"
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: bitblik_client
+    ports:
+      - "8787:80"  # Default Vite port
+#    depends_on:
+#      - coordinator
+
+volumes:
+  postgres_data: # Define the named volume
+

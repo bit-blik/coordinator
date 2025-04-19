@@ -1,0 +1,12 @@
+- if status is takerPaymentFailed, show the offer in main screen with button redeem by submiting a bolt11 invoice
+- paste on web
+- why it doesn't work well on mobile browsersw
+- enter amount in PLN
+- show details of invoice to pay (amount in sats + fees)
+- fix entering ln address before entering the offers list
+- allow edit of ln address
+- fix navigating from my active order in main for status blikReceived
+
+- backup of keys
+- re-generate new keys
+- other options except simplex (element?)

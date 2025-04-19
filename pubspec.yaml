@@ -1,0 +1,26 @@
+name: bitblik_coordinator
+description: A simple Dart server-side application.
+version: 1.0.0
+# repository: https://github.com/your_org/your_repo
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+# Add regular dependencies here.
+dependencies:
+  postgres: ^2.6.1 # Or latest version
+  grpc: ^4.0.4 # Or latest version
+  protobuf: ^4.0.0 # Or latest version
+  # dart_nostr: ^9.0.0 # Removed for HTTP MVP
+  uuid: ^4.0.0 # Or latest version
+  fixnum: ^1.1.0 # For Int64 support in protobuf
+  shelf: ^1.4.0 # For HTTP server framework
+  shelf_router: ^1.1.0 # For routing requests
+  http: ^1.2.1 # Added for making HTTP requests (LNURL)
+  shelf_cors_headers: ^0.1.5 # For adding CORS headers
+  process_run: ^1.2.4 # For running shell commands
+  # path: ^1.8.0
+
+dev_dependencies:
+  lints: ^3.0.0
+  test: ^1.24.0
