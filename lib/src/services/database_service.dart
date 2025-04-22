@@ -276,6 +276,7 @@ class DatabaseService {
       OfferStatus.blikSentToMaker.name,
       OfferStatus.makerConfirmed.name,
       OfferStatus.takerPaymentFailed.name,
+      OfferStatus.takerPaid.name
     ];
 
     final results = await _connection!.query(
