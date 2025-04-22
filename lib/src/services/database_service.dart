@@ -273,8 +273,9 @@ class DatabaseService {
       OfferStatus.published.name,
       OfferStatus.reserved.name,
       OfferStatus.blikReceived.name,
-      OfferStatus.blikSentToMaker.name, // <-- ADDED
+      OfferStatus.blikSentToMaker.name,
       OfferStatus.makerConfirmed.name,
+      OfferStatus.takerPaymentFailed.name,
     ];
 
     final results = await _connection!.query(
