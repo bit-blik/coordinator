@@ -133,20 +133,30 @@ class LndService {
   // TODO: Implement sendPayment using _routerClient.sendPaymentV2 or _lightningClient.sendPaymentSync
   // sendPaymentV2 is generally preferred for better feedback
   Stream<Payment> sendPayment(String paymentRequest,
-      {int? timeoutSeconds, int? feeLimitSat}) {
+      {required int expectedAmountSat,
+      int? timeoutSeconds,
+      int? feeLimitSat}) async* {
     if (_routerClient == null) throw StateError('LND not connected.');
+    if (_lightningClient == null) throw StateError('LND not connected.');
+
+    // Decode the invoice to get the amount
+    final decodeReq = PayReqString()..payReq = paymentRequest;
+    final decoded = await _lightningClient!.decodePayReq(decodeReq);
+    final invoiceAmountSat = decoded.numSatoshis.toInt();
+    if (invoiceAmountSat != expectedAmountSat) {
+      throw ArgumentError(
+          'Invoice amount $invoiceAmountSat does not match expected offer amount $expectedAmountSat sats');
+    }
 
     final request = SendPaymentRequest()
       ..paymentRequest = paymentRequest
-      ..timeoutSeconds = timeoutSeconds ?? 60; // Use standard int
+      ..timeoutSeconds = timeoutSeconds ?? 60;
 
-    // Set fee limit directly
-    int effectiveFeeLimit = feeLimitSat ?? 0; // Default to 0 if null
-    request.feeLimitSat =
-        Int64(effectiveFeeLimit); // Use Int64 for fee_limit_sat
+    int effectiveFeeLimit = feeLimitSat ?? 0;
+    request.feeLimitSat = Int64(effectiveFeeLimit);
 
     print('Sending payment for invoice: $paymentRequest');
-    return _routerClient!.sendPaymentV2(request);
+    yield* _routerClient!.sendPaymentV2(request);
   }
 
   // Removed subscribeInvoices method (using LightningClient) as we'll use

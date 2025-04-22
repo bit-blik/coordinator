@@ -1,3 +1,4 @@
+- check amount when paying taker!!!!
 - if status is takerPaymentFailed, show the offer in main screen with button redeem by submiting a bolt11 invoice
 - paste on web
 - why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
@@ -7,6 +8,8 @@
 - allow edit of ln address
 - fix navigating from my active order in main for status blikReceived
 - bad blik code on screen waiting for confirmation
+
+- new offer status (settlingTakerInvoice), and handle it on taker screen showing payment in progress
 
 - backup of keys
 - re-generate new keys

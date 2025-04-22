@@ -652,8 +652,18 @@ class CoordinatorService {
   Future<void> _sendTakerPayment(String offerId, String takerInvoice) async {
     print('Attempting to send taker payment for offer $offerId...');
     try {
-      final paymentStream =
-          _lndService.sendPayment(takerInvoice, feeLimitSat: 10);
+      final offer = await _dbService.getOfferById(offerId);
+      if (offer == null) {
+        print('Offer $offerId not found for taker payment.');
+        await _dbService.updateOfferStatus(
+            offerId, OfferStatus.takerPaymentFailed);
+        return;
+      }
+      final paymentStream = _lndService.sendPayment(
+        takerInvoice,
+        expectedAmountSat: offer.amountSats,
+        feeLimitSat: 10,
+      );
       bool paymentSucceeded = false;
       await for (final paymentUpdate in paymentStream) {
         if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
