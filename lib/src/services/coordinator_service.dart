@@ -534,6 +534,28 @@ class CoordinatorService {
     return true;
   }
 
+  // --- Update Taker Invoice ---
+  Future<bool> updateTakerInvoice(
+      String offerId, String takerInvoice, String userPubkey) async {
+    print('Updating taker invoice for offer $offerId by user $userPubkey');
+    final offer = await _dbService.getOfferById(offerId);
+    if (offer == null) {
+      print('Offer $offerId not found.');
+      return false;
+    }
+    if (offer.takerPubkey != userPubkey) {
+      print('User pubkey mismatch for updating taker invoice.');
+      return false;
+    }
+    final success = await _dbService.updateTakerInvoice(offerId, takerInvoice);
+    if (success) {
+      print('Taker invoice updated for offer $offerId.');
+    } else {
+      print('Failed to update taker invoice for offer $offerId.');
+    }
+    return success;
+  }
+
   // --- Offer Cancellation ---
   Future<bool> cancelOffer(String offerId, String makerId) async {
     print('Maker $makerId attempting to cancel offer $offerId');
@@ -618,20 +640,30 @@ class CoordinatorService {
             'Async Warning: Failed to store resolved taker invoice for offer $offerId. Proceeding with payment attempt.');
       }
 
-      print(
-          'Async: Resolved LNURL to invoice ($takerInvoice), attempting payment for offer $offerId...');
+      await _sendTakerPayment(offerId, takerInvoice);
+    } catch (e) {
+      print('Async Exception during taker payment for offer $offerId: $e');
+      await _dbService.updateOfferStatus(
+          offerId, OfferStatus.takerPaymentFailed);
+    }
+  }
+
+  // --- Refactored taker payment logic ---
+  Future<void> _sendTakerPayment(String offerId, String takerInvoice) async {
+    print('Attempting to send taker payment for offer $offerId...');
+    try {
       final paymentStream =
           _lndService.sendPayment(takerInvoice, feeLimitSat: 10);
       bool paymentSucceeded = false;
       await for (final paymentUpdate in paymentStream) {
         if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
-          print('Async: Successfully paid taker for offer $offerId.');
+          print('Successfully paid taker for offer $offerId.');
           await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid);
           paymentSucceeded = true;
           return;
         } else if (paymentUpdate.status == Payment_PaymentStatus.FAILED) {
           print(
-              'Async Error: Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}');
+              'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}');
           await _dbService.updateOfferStatus(
               offerId, OfferStatus.takerPaymentFailed);
           return;
@@ -639,15 +671,35 @@ class CoordinatorService {
       }
       if (!paymentSucceeded) {
         print(
-            'Async Warning: Taker payment stream completed without definitive status for offer $offerId.');
+            'Taker payment stream completed without definitive status for offer $offerId.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
       }
     } catch (e) {
-      print('Async Exception during taker payment for offer $offerId: $e');
+      print('Exception during taker payment for offer $offerId: $e');
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
     }
+  }
+
+  // --- Retry taker payment with stored invoice ---
+  Future<bool> retryTakerPayment(String offerId, String userPubkey) async {
+    print('Retrying taker payment for offer $offerId by user $userPubkey');
+    final offer = await _dbService.getOfferById(offerId);
+    if (offer == null) {
+      print('Offer $offerId not found.');
+      return false;
+    }
+    if (offer.takerPubkey != userPubkey) {
+      print('User pubkey mismatch for retrying taker payment.');
+      return false;
+    }
+    if (offer.takerInvoice == null || offer.takerInvoice!.isEmpty) {
+      print('No taker invoice available for offer $offerId.');
+      return false;
+    }
+    await _sendTakerPayment(offerId, offer.takerInvoice!);
+    return true;
   }
 
   // --- Helper Methods ---

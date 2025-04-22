@@ -16,10 +16,71 @@ class ApiService {
     _router.post('/offers/<offerId>/blik', _submitBlikHandler);
     _router.get('/offers/<offerId>/blik', _getBlikHandler);
     _router.post('/offers/<offerId>/confirm', _confirmPaymentHandler);
+    _router.post(
+        '/offers/<offerId>/update-invoice', _updateTakerInvoiceHandler);
     _router.get('/my-active-offer', _getMyActiveOfferHandler);
     _router.get('/offer-status/<paymentHash>', _getOfferStatusHandler);
+    _router.post(
+        '/offers/<offerId>/retry-taker-payment', _retryTakerPaymentHandler);
     _router.delete(
         '/offers/<offerId>/cancel', _cancelOfferHandler); // New cancel endpoint
+  }
+
+  Future<Response> _retryTakerPaymentHandler(
+      Request request, String offerId) async {
+    try {
+      final userPubkey = request.headers['x-user-pubkey'];
+      if (userPubkey == null || userPubkey.isEmpty) {
+        return Response.unauthorized(jsonEncode(
+            {'error': 'Missing user identification (x-user-pubkey header)'}));
+      }
+      final success =
+          await _coordinatorService.retryTakerPayment(offerId, userPubkey);
+      if (success) {
+        return Response.ok(jsonEncode({'message': 'Taker payment retried'}),
+            headers: {'Content-Type': 'application/json'});
+      } else {
+        return Response(409,
+            body: jsonEncode({'error': 'Failed to retry taker payment'}));
+      }
+    } catch (e) {
+      print('Error in _retryTakerPaymentHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode(
+              {'error': 'Failed to retry taker payment: ${e.toString()}'}));
+    }
+  }
+
+  Future<Response> _updateTakerInvoiceHandler(
+      Request request, String offerId) async {
+    try {
+      final userPubkey = request.headers['x-user-pubkey'];
+      if (userPubkey == null || userPubkey.isEmpty) {
+        return Response.unauthorized(jsonEncode(
+            {'error': 'Missing user identification (x-user-pubkey header)'}));
+      }
+      final body = await request.readAsString();
+      final jsonBody = jsonDecode(body) as Map<String, dynamic>;
+      final bolt11 = jsonBody['bolt11'] as String?;
+      if (bolt11 == null) {
+        return Response.badRequest(
+            body: jsonEncode({'error': 'Missing required field: bolt11'}));
+      }
+      final success = await _coordinatorService.updateTakerInvoice(
+          offerId, bolt11, userPubkey);
+      if (success) {
+        return Response.ok(jsonEncode({'message': 'Taker invoice updated'}),
+            headers: {'Content-Type': 'application/json'});
+      } else {
+        return Response(409,
+            body: jsonEncode({'error': 'Failed to update taker invoice'}));
+      }
+    } catch (e) {
+      print('Error in _updateTakerInvoiceHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode(
+              {'error': 'Failed to update taker invoice: ${e.toString()}'}));
+    }
   }
 
   // Getter for the main handler

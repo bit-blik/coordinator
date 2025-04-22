@@ -2,7 +2,7 @@ import 'package:postgres/postgres.dart';
 import '../models/offer.dart';
 
 // TODO: Load connection details securely (e.g., from environment variables)
-final _dbHost = 'localhost';
+final _dbHost = '192.168.1.18';
 final _dbPort = 5434;
 final _dbName = 'bitblik_db';
 final _dbUser = 'user'; // Replace with your DB user
