@@ -312,7 +312,7 @@ class ApiService {
             'blik_code': offer.blikCode, // Include BLIK code
             // Add other relevant fields if needed by the client (e.g., taker_lightning_address for Maker?)
           };
-          print('[DEBUG] my-active-offer response: $offerMap');
+          // print('[DEBUG] my-active-offer response: $offerMap');
           return Response.ok(jsonEncode(offerMap),
               headers: {'Content-Type': 'application/json'});
         } else {
