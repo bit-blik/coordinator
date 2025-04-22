@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:bitblik_coordinator/src/models/offer.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import '../services/coordinator_service.dart';
@@ -278,26 +279,47 @@ class ApiService {
       final activeOffers =
           await _coordinatorService.getMyActiveOffers(userPubkey);
       if (activeOffers.isNotEmpty) {
-        final offer = activeOffers.first;
-        // Manually construct the JSON map
-        final offerMap = {
-          'id': offer.id,
-          'amount_sats': offer.amountSats,
-          'fee_sats': offer.feeSats,
-          'maker_pubkey': offer.makerPubkey,
-          'taker_pubkey': offer.takerPubkey,
-          'taker_lightning_address': offer.takerLightningAddress,
-          'status': offer.status.name,
-          'created_at': offer.createdAt.toIso8601String(),
-          'reserved_at': offer.reservedAt?.toIso8601String(),
-          'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
-          'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
-          'blik_code': offer.blikCode, // Include BLIK code
-          // Add other relevant fields if needed by the client (e.g., taker_lightning_address for Maker?)
-        };
-        // print('[DEBUG] my-active-offer response: $offerMap');
-        return Response.ok(jsonEncode(offerMap),
-            headers: {'Content-Type': 'application/json'});
+        // Find the first offer that is either:
+        // - not takerPaymentFailed
+        // - or takerPaymentFailed and userPubkey matches taker_pubkey
+        Offer? selectedOffer;
+        for (final offer in activeOffers) {
+          if (offer.status.name == 'takerPaymentFailed') {
+            if (offer.takerPubkey == userPubkey) {
+              selectedOffer = offer;
+              break;
+            }
+          } else {
+            selectedOffer = offer;
+            break;
+          }
+        }
+        if (selectedOffer != null) {
+          final offer = selectedOffer;
+          // Manually construct the JSON map
+          final offerMap = {
+            'id': offer.id,
+            'amount_sats': offer.amountSats,
+            'fee_sats': offer.feeSats,
+            'maker_pubkey': offer.makerPubkey,
+            'taker_pubkey': offer.takerPubkey,
+            'taker_lightning_address': offer.takerLightningAddress,
+            'status': offer.status.name,
+            'created_at': offer.createdAt.toIso8601String(),
+            'reserved_at': offer.reservedAt?.toIso8601String(),
+            'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
+            'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
+            'blik_code': offer.blikCode, // Include BLIK code
+            // Add other relevant fields if needed by the client (e.g., taker_lightning_address for Maker?)
+          };
+          print('[DEBUG] my-active-offer response: $offerMap');
+          return Response.ok(jsonEncode(offerMap),
+              headers: {'Content-Type': 'application/json'});
+        } else {
+          return Response.ok(jsonEncode({}), headers: {
+            'Content-Type': 'application/json'
+          }); // Return empty object
+        }
       } else {
         return Response.ok(jsonEncode({}), headers: {
           'Content-Type': 'application/json'
