@@ -282,10 +282,18 @@ class ApiService {
         // Find the first offer that is either:
         // - not takerPaymentFailed
         // - or takerPaymentFailed and userPubkey matches taker_pubkey
+        // - or takerPaid and takerPaidAt is within 24h
         Offer? selectedOffer;
+        final now = DateTime.now().toUtc();
         for (final offer in activeOffers) {
           if (offer.status.name == 'takerPaymentFailed') {
             if (offer.takerPubkey == userPubkey) {
+              selectedOffer = offer;
+              break;
+            }
+          } else if (offer.status.name == 'takerPaid') {
+            if (offer.takerPaidAt != null &&
+                now.difference(offer.takerPaidAt!.toUtc()).inHours < 24) {
               selectedOffer = offer;
               break;
             }
@@ -310,6 +318,7 @@ class ApiService {
             'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
             'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
             'blik_code': offer.blikCode, // Include BLIK code
+            'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
             // Add other relevant fields if needed by the client (e.g., taker_lightning_address for Maker?)
           };
           // print('[DEBUG] my-active-offer response: $offerMap');
