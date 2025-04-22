@@ -292,6 +292,9 @@ class ApiService {
               break;
             }
           } else if (offer.status.name == 'takerPaid') {
+            print(
+                '[DEBUG]${now.difference(offer.takerPaidAt!.toUtc()).inHours}');
+
             if (offer.takerPaidAt != null &&
                 now.difference(offer.takerPaidAt!.toUtc()).inHours < 24) {
               selectedOffer = offer;
