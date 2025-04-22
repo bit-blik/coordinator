@@ -11,5 +11,6 @@
 - backup of keys
 - re-generate new keys
 - other options except simplex (element/webpushs/telegram bot?)
+- save the failed payment reason (could not get an invoice from lnurl/ no route /??)
 
 - refactor to use websockets / nostr

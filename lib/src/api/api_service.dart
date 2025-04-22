@@ -286,6 +286,7 @@ class ApiService {
           'fee_sats': offer.feeSats,
           'maker_pubkey': offer.makerPubkey,
           'taker_pubkey': offer.takerPubkey,
+          'taker_lightning_address': offer.takerLightningAddress,
           'status': offer.status.name,
           'created_at': offer.createdAt.toIso8601String(),
           'reserved_at': offer.reservedAt?.toIso8601String(),
