@@ -20,6 +20,7 @@ class ApiService {
     _router.post(
         '/offers/<offerId>/update-invoice', _updateTakerInvoiceHandler);
     _router.get('/my-active-offer', _getMyActiveOfferHandler);
+    _router.get('/my-finished-offers', _getMyFinishedOffersHandler);
     _router.get('/offer-status/<paymentHash>', _getOfferStatusHandler);
     _router.post(
         '/offers/<offerId>/retry-taker-payment', _retryTakerPaymentHandler);
@@ -282,9 +283,7 @@ class ApiService {
         // Find the first offer that is either:
         // - not takerPaymentFailed
         // - or takerPaymentFailed and userPubkey matches taker_pubkey
-        // - or takerPaid and takerPaidAt is within 24h
         Offer? selectedOffer;
-        final now = DateTime.now().toUtc();
         for (final offer in activeOffers) {
           if (offer.status.name == 'takerPaymentFailed') {
             if (offer.takerPubkey == userPubkey) {
@@ -292,14 +291,8 @@ class ApiService {
               break;
             }
           } else if (offer.status.name == 'takerPaid') {
-            print(
-                '[DEBUG]${now.difference(offer.takerPaidAt!.toUtc()).inHours}');
-
-            if (offer.takerPaidAt != null &&
-                now.difference(offer.takerPaidAt!.toUtc()).inHours < 24) {
-              selectedOffer = offer;
-              break;
-            }
+            // skip takerPaid offers from active
+            continue;
           } else {
             selectedOffer = offer;
             break;
@@ -342,6 +335,51 @@ class ApiService {
       return Response.internalServerError(
           body: jsonEncode(
               {'error': 'Failed to get active offer: ${e.toString()}'}));
+    }
+  }
+
+  // New endpoint: /my-finished-offers
+  Future<Response> _getMyFinishedOffersHandler(Request request) async {
+    try {
+      final userPubkey = request.headers['x-user-pubkey'];
+      if (userPubkey == null || userPubkey.isEmpty) {
+        return Response.unauthorized(jsonEncode(
+            {'error': 'Missing user identification (x-user-pubkey header)'}));
+      }
+      final offers = await _coordinatorService.getMyActiveOffers(userPubkey);
+      final now = DateTime.now().toUtc();
+      final finished = offers
+          .where((offer) =>
+              offer.status.name == 'takerPaid' &&
+              offer.takerPaidAt != null &&
+              now.difference(offer.takerPaidAt!.toUtc()).inHours < 24)
+          .toList();
+
+      final finishedList = finished
+          .map((offer) => {
+                'id': offer.id,
+                'amount_sats': offer.amountSats,
+                'fee_sats': offer.feeSats,
+                'maker_pubkey': offer.makerPubkey,
+                'taker_pubkey': offer.takerPubkey,
+                'taker_lightning_address': offer.takerLightningAddress,
+                'status': offer.status.name,
+                'created_at': offer.createdAt.toIso8601String(),
+                'reserved_at': offer.reservedAt?.toIso8601String(),
+                'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
+                'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
+                'blik_code': offer.blikCode,
+                'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
+              })
+          .toList();
+
+      return Response.ok(jsonEncode(finishedList),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      print('Error in _getMyFinishedOffersHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode(
+              {'error': 'Failed to get finished offers: ${e.toString()}'}));
     }
   }
 
