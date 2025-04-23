@@ -301,10 +301,6 @@ class DatabaseService {
 
   Offer _mapRowToOffer(PostgreSQLResultRow row) {
     final map = row.toColumnMap();
-    if (map['fiat_currency']!=null) {
-      print(
-          "amount_sats: ${map['amount_sats']}, fiat_amount:${map['fiat_amount']}, fiat_currency:${map['fiat_currency']}");
-    }
     return Offer(
       id: map['id'],
       amountSats: map['amount_sats'],
