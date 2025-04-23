@@ -390,7 +390,17 @@ class ApiService {
       final offer =
           await _coordinatorService.getOfferByPaymentHash(paymentHash);
       if (offer != null) {
-        return Response.ok(jsonEncode({'status': offer.status.name}),
+        final offerMap = {
+          'id': offer.id,
+          'amount_sats': offer.amountSats,
+          'fee_sats': offer.feeSats,
+          'status': offer.status.name,
+          'created_at': offer.createdAt.toIso8601String(),
+          'blik_code': offer.blikCode, // Include BLIK code
+          'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
+        };
+
+        return Response.ok(jsonEncode(offerMap),
             headers: {'Content-Type': 'application/json'});
       } else {
         return Response.ok(jsonEncode({'status': 'pending_creation'}),
