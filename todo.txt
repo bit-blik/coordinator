@@ -2,8 +2,6 @@
 - paste on web
 - enter amount in PLN
 - show details of invoice to pay (amount in sats + fees)
-- fix entering ln address before entering the offers list
-- allow edit of ln address
 - fix navigating from my active order in main for status blikReceived
 - bad blik code on screen waiting for confirmation
 

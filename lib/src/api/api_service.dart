@@ -94,19 +94,19 @@ class ApiService {
     try {
       final body = await request.readAsString();
       final jsonBody = jsonDecode(body) as Map<String, dynamic>;
-      final amountSats = jsonBody['amount_sats'] as int?;
+      final fiatAmount = (jsonBody['fiat_amount'] as num?)?.toDouble();
       final feePercentage = jsonBody['fee_percentage'] as int?;
       final makerId = jsonBody['maker_id'] as String?;
 
-      if (amountSats == null || feePercentage == null || makerId == null) {
+      if (fiatAmount == null || feePercentage == null || makerId == null) {
         return Response.badRequest(
             body: jsonEncode({
           'error':
-              'Missing required fields: amount_sats, fee_percentage, maker_id'
+              'Missing required fields: fiat_amount, fee_percentage, maker_id'
         }));
       }
-      final result = await _coordinatorService.initiateOffer(
-        amountSats: amountSats,
+      final result = await _coordinatorService.initiateOfferFiat(
+        fiatAmount: fiatAmount,
         feePercentage: feePercentage,
         makerId: makerId,
       );

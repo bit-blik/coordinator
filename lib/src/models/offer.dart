@@ -36,6 +36,10 @@ class Offer {
   DateTime? settledAt; // Timestamp when hold invoice was settled
   DateTime? takerPaidAt; // Timestamp when taker was paid
 
+  // Fiat support
+  final double? fiatAmount;
+  final String? fiatCurrency;
+
   Offer({
     String? id,
     required this.amountSats,
@@ -55,6 +59,8 @@ class Offer {
     this.makerConfirmedAt,
     this.settledAt,
     this.takerPaidAt,
+    this.fiatAmount,
+    this.fiatCurrency,
   })  : id = id ?? Uuid().v4(),
         createdAt = createdAt ?? DateTime.now().toUtc();
 

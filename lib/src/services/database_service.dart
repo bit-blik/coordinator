@@ -60,7 +60,9 @@ class DatabaseService {
         blik_received_at TIMESTAMPTZ,
         maker_confirmed_at TIMESTAMPTZ,
         settled_at TIMESTAMPTZ,
-        taker_paid_at TIMESTAMPTZ
+        taker_paid_at TIMESTAMPTZ,
+        fiat_amount NUMERIC,
+        fiat_currency TEXT
       );
     ''');
     await _connection!.execute('''
@@ -81,8 +83,8 @@ class DatabaseService {
     final now = DateTime.now().toUtc();
     await _connection!.execute(
       '''
-        INSERT INTO offers (id, amount_sats, fee_sats, maker_pubkey, hold_invoice_payment_hash, hold_invoice_preimage, status, created_at, updated_at)
-        VALUES (@id, @amount_sats, @fee_sats, @maker_pubkey, @hold_invoice_payment_hash, @hold_invoice_preimage, @status, @created_at, @updated_at)
+        INSERT INTO offers (id, amount_sats, fee_sats, maker_pubkey, hold_invoice_payment_hash, hold_invoice_preimage, status, created_at, updated_at, fiat_amount, fiat_currency)
+        VALUES (@id, @amount_sats, @fee_sats, @maker_pubkey, @hold_invoice_payment_hash, @hold_invoice_preimage, @status, @created_at, @updated_at, @fiat_amount, @fiat_currency)
       ''',
       substitutionValues: {
         'id': offer.id,
@@ -94,6 +96,8 @@ class DatabaseService {
         'status': offer.status.name,
         'created_at': offer.createdAt.toUtc(),
         'updated_at': now,
+        'fiat_amount': offer.fiatAmount,
+        'fiat_currency': offer.fiatCurrency,
       },
     );
     offer.updatedAt = now;
@@ -305,6 +309,10 @@ class DatabaseService {
       holdInvoicePreimage: map['hold_invoice_preimage'],
       status: OfferStatus.values.byName(map['status']),
       createdAt: (map['created_at'] as DateTime).toLocal(),
+      fiatAmount: map['fiat_amount'] != null
+          ? (map['fiat_amount'] as num).toDouble()
+          : null,
+      fiatCurrency: map['fiat_currency'],
     )
       ..takerPubkey = map['taker_pubkey']
       ..takerLightningAddress = map['taker_lightning_address']

@@ -17,6 +17,34 @@ class CoordinatorService {
   final DatabaseService _dbService;
   final LndService _lndService;
 
+  // CoinGecko rate cache
+  double? _cachedPlnRate;
+  DateTime? _cachedPlnRateTime;
+
+  Future<double> _getPlnRate() async {
+    final now = DateTime.now();
+    if (_cachedPlnRate != null &&
+        _cachedPlnRateTime != null &&
+        now.difference(_cachedPlnRateTime!).inMinutes < 5) {
+      return _cachedPlnRate!;
+    }
+    final url = Uri.parse('https://api.coingecko.com/api/v3/exchange_rates');
+    final response = await http.get(url);
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch CoinGecko rates');
+    }
+    final data = jsonDecode(response.body);
+    final plnRate = data['rates']?['pln']?['value'];
+    final btcRate = data['rates']?['btc']?['value'];
+    if (plnRate == null || btcRate == null) {
+      throw Exception('PLN or BTC rate missing in CoinGecko response');
+    }
+    // PLN per BTC = pln.value / btc.value (btc.value should be 1)
+    _cachedPlnRate = plnRate / btcRate;
+    _cachedPlnRateTime = now;
+    return _cachedPlnRate!;
+  }
+
   // WARNING: In-memory storage is not persistent. Use Redis or DB for production.
   final Map<String, Map<String, dynamic>> _pendingOffers = {};
   // Map to hold active subscriptions for cancellation
@@ -142,37 +170,50 @@ class CoordinatorService {
   }
 
   // --- Offer Creation Logic ---
-  Future<Map<String, dynamic>> initiateOffer({
-    required int amountSats,
+  Future<Map<String, dynamic>> initiateOfferFiat({
+    required double fiatAmount,
     required int feePercentage,
     required String makerId,
+    String fiatCurrency = 'PLN',
   }) async {
     print(
-        'Initiating offer: amount=$amountSats, fee%=$feePercentage, maker=$makerId');
-    final feeSats = (amountSats * feePercentage / 100).ceil();
-    final totalAmountSats = amountSats + feeSats;
+        'Initiating offer: fiatAmount=$fiatAmount $fiatCurrency, fee%=$feePercentage, maker=$makerId');
+    final rate = await _getPlnRate();
+    final btcPerPln = 1 / rate;
+    final btcAmount = fiatAmount * btcPerPln;
+    final satsAmount = (btcAmount * 100000000).round();
+    final feeSats = (satsAmount * feePercentage / 100).ceil();
+    final totalAmountSats = satsAmount + feeSats;
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
     final paymentHashHex = paymentHash
         .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
         .join('');
-    final memo = 'BitBlik Offer: $amountSats sats for BLIK';
+    final memo = 'BitBlik Offer: $fiatAmount $fiatCurrency for BLIK';
     final lndResponse =
         await _lndService.createHoldInvoice(totalAmountSats, memo, paymentHash);
     final holdInvoice = lndResponse.paymentRequest;
     final preimageHex =
         preimage.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join('');
     _pendingOffers[paymentHashHex] = {
-      'amountSats': amountSats,
+      'amountSats': satsAmount,
       'feeSats': feeSats,
       'makerId': makerId,
       'preimageHex': preimageHex,
+      'fiatAmount': fiatAmount,
+      'fiatCurrency': fiatCurrency,
     };
     print('Pending offer stored for payment hash $paymentHashHex');
     _startInvoiceSubscription(paymentHash, paymentHashHex);
     return {
       'holdInvoice': holdInvoice,
       'paymentHash': paymentHashHex,
+      'fiatAmount': fiatAmount,
+      'fiatCurrency': fiatCurrency,
+      'amountSats': satsAmount,
+      'feeSats': feeSats,
+      'totalAmountSats': totalAmountSats,
+      'rate': rate,
     };
   }
 
@@ -248,6 +289,8 @@ class CoordinatorService {
         holdInvoicePaymentHash: paymentHashHex,
         holdInvoicePreimage: pendingData['preimageHex'],
         status: OfferStatus.funded,
+        fiatAmount: pendingData['fiatAmount'],
+        fiatCurrency: pendingData['fiatCurrency'],
       );
       await _dbService.createOffer(offer);
       // Execute ls command
