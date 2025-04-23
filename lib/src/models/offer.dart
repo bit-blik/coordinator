@@ -38,8 +38,8 @@ class Offer {
   DateTime? takerPaidAt; // Timestamp when taker was paid
 
   // Fiat support
-  final double? fiatAmount;
-  final String? fiatCurrency;
+  final double fiatAmount;
+  final String fiatCurrency;
 
   Offer({
     String? id,
@@ -60,8 +60,8 @@ class Offer {
     this.makerConfirmedAt,
     this.settledAt,
     this.takerPaidAt,
-    this.fiatAmount,
-    this.fiatCurrency,
+    required this.fiatAmount,
+    required this.fiatCurrency,
   })  : id = id ?? Uuid().v4(),
         createdAt = createdAt ?? DateTime.now().toUtc();
 

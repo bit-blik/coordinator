@@ -314,6 +314,8 @@ class ApiService {
             'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
             'blik_code': offer.blikCode, // Include BLIK code
             'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
+            'fiat_amount': offer.fiatAmount,
+            'fiat_currency': offer.fiatCurrency,
             // Add other relevant fields if needed by the client (e.g., taker_lightning_address for Maker?)
           };
           // print('[DEBUG] my-active-offer response: $offerMap');
