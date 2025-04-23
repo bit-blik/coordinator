@@ -485,7 +485,7 @@ class CoordinatorService {
       return false;
     }
     final takerInvoice = await _resolveLnurlPay(
-        offer.takerLightningAddress!, offer.amountSats);
+        takerLightningAddress, offer.amountSats);
     if (takerInvoice==null || takerInvoice.isEmpty) {
       print('Could not get an invoice for amount ${offer.amountSats} sats for LN address $takerLightningAddress');
       return false;
