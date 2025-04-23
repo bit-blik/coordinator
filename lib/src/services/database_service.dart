@@ -279,6 +279,7 @@ class DatabaseService {
       OfferStatus.blikReceived.name,
       OfferStatus.blikSentToMaker.name,
       OfferStatus.makerConfirmed.name,
+      OfferStatus.payingTaker.name,
       OfferStatus.takerPaymentFailed.name,
       OfferStatus.takerPaid.name
     ];

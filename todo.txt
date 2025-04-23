@@ -4,6 +4,7 @@
 - bad blik code on screen waiting for confirmation
 - comma instead of dot for Polish locale
 - add 10min expiration time for offers
+- sign the api requests with priv key
 
 - new offer status (settlingTakerInvoice), and handle it on taker screen showing payment in progress
 
