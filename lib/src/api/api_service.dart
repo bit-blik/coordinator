@@ -203,8 +203,9 @@ class ApiService {
                   'Failed to submit BLIK code. Offer state might be invalid or taker mismatch.'
             }));
       }
-    } catch (e) {
+    } catch (e,s) {
       print('Error in _submitBlikHandler: $e');
+      print('Stack: $s');
       return Response.internalServerError(
           body: jsonEncode(
               {'error': 'Failed to submit BLIK code: ${e.toString()}'}));
