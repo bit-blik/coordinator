@@ -1,11 +1,15 @@
-- if status is takerPaymentFailed, show the offer in main screen with button redeem by submiting a bolt11 invoice
 - paste on web
+- fix/test takerPaymentFailed -> new invoice redeem flow, 
 - show details of invoice to pay (amount in sats + fees)
+- set fee 0.5%
 - bad blik code on screen waiting for confirmation
 - comma instead of dot for Polish locale
+- add 10min expiration time for offers
 
 - new offer status (settlingTakerInvoice), and handle it on taker screen showing payment in progress
 
+- NWC wallet integration
+- fidelity bond for taker
 - backup of keys
 - re-generate new keys
 - other options except simplex (element/webpushs/telegram bot?)
