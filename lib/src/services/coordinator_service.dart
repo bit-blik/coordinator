@@ -334,6 +334,8 @@ class CoordinatorService {
         'id': offer.id,
         'amount_sats': offer.amountSats,
         'fee_sats': offer.feeSats,
+        'fiat_amount': offer.fiatAmount,
+        'fiat_currency': offer.fiatCurrency,
         'status': offer.status.name, // Return actual status
         'created_at': offer.createdAt.toIso8601String(),
         'reserved_at':
