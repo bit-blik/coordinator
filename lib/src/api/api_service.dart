@@ -36,14 +36,14 @@ class ApiService {
         return Response.unauthorized(jsonEncode(
             {'error': 'Missing user identification (x-user-pubkey header)'}));
       }
-      final success =
+      final error =
           await _coordinatorService.retryTakerPayment(offerId, userPubkey);
-      if (success) {
+      if (error == null) {
         return Response.ok(jsonEncode({'message': 'Taker payment retried'}),
             headers: {'Content-Type': 'application/json'});
       } else {
         return Response(409,
-            body: jsonEncode({'error': 'Failed to retry taker payment'}));
+            body: jsonEncode({'error': error}));
       }
     } catch (e) {
       print('Error in _retryTakerPaymentHandler: $e');

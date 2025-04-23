@@ -9,6 +9,7 @@ enum OfferStatus {
   blikSentToMaker, // Maker requested BLIK code
   makerConfirmed, // Maker confirmed BLIK payment success
   settled, // Hold invoice settled by coordinator
+  payingTaker, // Taker is being paid
   takerPaid, // Taker successfully paid via LNURL-pay
   expired, // Offer timed out (e.g., reservation, BLIK confirmation)
   cancelled, // Offer explicitly cancelled by Maker while in 'funded' state

@@ -668,6 +668,7 @@ class CoordinatorService {
           'Async Error: Offer $offerId not in settled state (state is ${offer.status}). Cannot pay taker.');
       return;
     }
+
     if (offer.takerLightningAddress == null) {
       print('Async Error: Taker Lightning Address missing for offer $offerId.');
       await _dbService.updateOfferStatus(
@@ -703,7 +704,7 @@ class CoordinatorService {
   }
 
   // --- Refactored taker payment logic ---
-  Future<void> _sendTakerPayment(String offerId, String takerInvoice) async {
+  Future<String?> _sendTakerPayment(String offerId, String takerInvoice) async {
     print('Attempting to send taker payment for offer $offerId...');
     try {
       final offer = await _dbService.getOfferById(offerId);
@@ -711,8 +712,11 @@ class CoordinatorService {
         print('Offer $offerId not found for taker payment.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
-        return;
+        return "invalid offer";
       }
+      await _dbService.updateOfferStatus(
+          offerId, OfferStatus.payingTaker);
+
       final paymentStream = _lndService.sendPayment(
         takerInvoice,
         expectedAmountSat: offer.amountSats,
@@ -724,13 +728,13 @@ class CoordinatorService {
           print('Successfully paid taker for offer $offerId.');
           await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid);
           paymentSucceeded = true;
-          return;
+          return null;
         } else if (paymentUpdate.status == Payment_PaymentStatus.FAILED) {
           print(
               'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}');
           await _dbService.updateOfferStatus(
               offerId, OfferStatus.takerPaymentFailed);
-          return;
+          return 'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}';
         }
       }
       if (!paymentSucceeded) {
@@ -738,32 +742,34 @@ class CoordinatorService {
             'Taker payment stream completed without definitive status for offer $offerId.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
+        return 'Taker payment stream completed without definitive status for offer $offerId.';
       }
+      return null;
     } catch (e) {
       print('Exception during taker payment for offer $offerId: $e');
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
+      return 'Exception during taker payment for offer $offerId: $e';
     }
   }
 
   // --- Retry taker payment with stored invoice ---
-  Future<bool> retryTakerPayment(String offerId, String userPubkey) async {
+  Future<String?> retryTakerPayment(String offerId, String userPubkey) async {
     print('Retrying taker payment for offer $offerId by user $userPubkey');
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null) {
       print('Offer $offerId not found.');
-      return false;
+      return "invalid offer";
     }
     if (offer.takerPubkey != userPubkey) {
       print('User pubkey mismatch for retrying taker payment.');
-      return false;
+      return "not your offer";
     }
     if (offer.takerInvoice == null || offer.takerInvoice!.isEmpty) {
       print('No taker invoice available for offer $offerId.');
-      return false;
+      return "No taker invoice in offer";
     }
-    await _sendTakerPayment(offerId, offer.takerInvoice!);
-    return true;
+    return await _sendTakerPayment(offerId, offer.takerInvoice!);
   }
 
   // --- Helper Methods ---
