@@ -362,6 +362,8 @@ class ApiService {
                 'id': offer.id,
                 'amount_sats': offer.amountSats,
                 'fee_sats': offer.feeSats,
+                'fiat_amount': offer.fiatAmount,
+                'fiat_currency': offer.fiatCurrency,
                 'maker_pubkey': offer.makerPubkey,
                 'taker_pubkey': offer.takerPubkey,
                 'taker_lightning_address': offer.takerLightningAddress,
