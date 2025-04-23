@@ -310,7 +310,9 @@ class DatabaseService {
       status: OfferStatus.values.byName(map['status']),
       createdAt: (map['created_at'] as DateTime).toLocal(),
       fiatAmount: map['fiat_amount'] != null
-          ? (map['fiat_amount'] as num).toDouble()
+          ? (map['fiat_amount'] is num
+              ? (map['fiat_amount'] as num).toDouble()
+              : double.tryParse(map['fiat_amount'].toString()))
           : null,
       fiatCurrency: map['fiat_currency'],
     )
