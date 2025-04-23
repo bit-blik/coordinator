@@ -313,7 +313,7 @@ class DatabaseService {
       fiatAmount: map['fiat_amount'] is num
               ? (map['fiat_amount'] as num).toDouble()
               : 0,
-      fiatCurrency: map['fiat_currency'],
+      fiatCurrency: map['fiat_currency']?? '?',
     )
       ..takerPubkey = map['taker_pubkey']
       ..takerLightningAddress = map['taker_lightning_address']
