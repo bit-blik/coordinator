@@ -1,8 +1,6 @@
 - if status is takerPaymentFailed, show the offer in main screen with button redeem by submiting a bolt11 invoice
 - paste on web
-- enter amount in PLN
 - show details of invoice to pay (amount in sats + fees)
-- fix navigating from my active order in main for status blikReceived
 - bad blik code on screen waiting for confirmation
 
 - new offer status (settlingTakerInvoice), and handle it on taker screen showing payment in progress
