@@ -314,7 +314,7 @@ class DatabaseService {
       holdInvoicePreimage: map['hold_invoice_preimage'],
       status: OfferStatus.values.byName(map['status']),
       createdAt: (map['created_at'] as DateTime).toLocal(),
-      fiatAmount: map['fiat_amount'],
+      fiatAmount: map['fiat_amount'] as double,
       fiatCurrency: map['fiat_currency']?? '?',
     )
       ..takerPubkey = map['taker_pubkey']
