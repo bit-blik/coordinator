@@ -200,7 +200,7 @@ class ApiService {
         return Response(409,
             body: jsonEncode({
               'error':
-                  'Failed to submit BLIK code. Offer state might be invalid or taker mismatch.'
+                  'Failed to submit BLIK code. Offer state might be invalid or taker mismatch. Also make sure your lightning address is valid and can generate invoice for the amount of offer'
             }));
       }
     } catch (e,s) {
