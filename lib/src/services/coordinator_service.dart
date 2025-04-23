@@ -293,9 +293,13 @@ class CoordinatorService {
         fiatCurrency: pendingData['fiatCurrency'],
       );
       await _dbService.createOffer(offer);
-      // Execute ls command
-      final result = await run(
-          'simplex-chat -e "#bitblik_3 new offer at https://bitblik.app/#/offers"');
+      // Execute simplex notification with sats and fiat info
+      final fiatText = offer.fiatAmount != null && offer.fiatCurrency != null
+          ? '${offer.fiatAmount!.toStringAsFixed(2)} ${offer.fiatCurrency}'
+          : 'N/A';
+      final simplexMsg =
+          '#bitblik_3 new offer: ${offer.amountSats} sats (${fiatText}) at https://bitblik.app/#/offers';
+      final result = await run('simplex-chat -e "$simplexMsg"');
       if (result.first.stderr.isNotEmpty) {
         print('simplex command error: ${result.first.stderr}');
       }
