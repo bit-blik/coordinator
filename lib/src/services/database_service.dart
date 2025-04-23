@@ -301,7 +301,8 @@ class DatabaseService {
 
   Offer _mapRowToOffer(PostgreSQLResultRow row) {
     final map = row.toColumnMap();
-    return Offer(
+    print("fiat_amount:${map['fiat_amount']}, fiat_currency:${map['fiat_currency']}");
+    Offer o = Offer(
       id: map['id'],
       amountSats: map['amount_sats'],
       feeSats: map['fee_sats'],
@@ -325,5 +326,7 @@ class DatabaseService {
       ..makerConfirmedAt = (map['maker_confirmed_at'] as DateTime?)?.toLocal()
       ..settledAt = (map['settled_at'] as DateTime?)?.toLocal()
       ..takerPaidAt = (map['taker_paid_at'] as DateTime?)?.toLocal();
+    print("o.fiat_amount:${o.fiatAmount}, o.fiat_currency:${o.fiatCurrency}");
+    return o;
   }
 }
