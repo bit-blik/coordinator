@@ -1,4 +1,3 @@
-- paste on web
 - fix/test takerPaymentFailed -> new invoice redeem flow, 
 - show details of invoice to pay (amount in sats + fees)
 - set fee 0.5%
@@ -8,6 +7,7 @@
 
 - new offer status (settlingTakerInvoice), and handle it on taker screen showing payment in progress
 
+- dart theme
 - NWC wallet integration
 - fidelity bond for taker
 - backup of keys
