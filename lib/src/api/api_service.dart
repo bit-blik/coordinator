@@ -331,8 +331,9 @@ class ApiService {
           'Content-Type': 'application/json'
         }); // Return empty object
       }
-    } catch (e) {
+    } catch (e,s) {
       print('Error in _getMyActiveOfferHandler: $e');
+      print('Stack: $s');
       return Response.internalServerError(
           body: jsonEncode(
               {'error': 'Failed to get active offer: ${e.toString()}'}));
