@@ -54,6 +54,8 @@ class CoordinatorService {
   // Map to hold active BLIK confirmation timers (120s)
   final Map<String, Timer> _blikConfirmationTimers = {};
 
+  final double kFeePercentage = 0.5;
+
   CoordinatorService(this._dbService, this._lndService);
 
   Future<void> init() async {
@@ -172,17 +174,16 @@ class CoordinatorService {
   // --- Offer Creation Logic ---
   Future<Map<String, dynamic>> initiateOfferFiat({
     required double fiatAmount,
-    required int feePercentage,
     required String makerId,
     String fiatCurrency = 'PLN',
   }) async {
     print(
-        'Initiating offer: fiatAmount=$fiatAmount $fiatCurrency, fee%=$feePercentage, maker=$makerId');
+        'Initiating offer: fiatAmount=$fiatAmount $fiatCurrency, maker=$makerId');
     final rate = await _getPlnRate();
     final btcPerPln = 1 / rate;
     final btcAmount = fiatAmount * btcPerPln;
     final satsAmount = (btcAmount * 100000000).round();
-    final feeSats = (satsAmount * feePercentage / 100).ceil();
+    final feeSats = (satsAmount * kFeePercentage / 100).ceil();
     final totalAmountSats = satsAmount + feeSats;
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;

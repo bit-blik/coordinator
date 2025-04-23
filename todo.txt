@@ -1,6 +1,4 @@
-- fix/test takerPaymentFailed -> new invoice redeem flow, 
 - show details of invoice to pay (amount in sats + fees)
-- set fee 0.5%
 - bad blik code on screen waiting for confirmation
 - comma instead of dot for Polish locale
 - add 10min expiration time for offers

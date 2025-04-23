@@ -95,10 +95,9 @@ class ApiService {
       final body = await request.readAsString();
       final jsonBody = jsonDecode(body) as Map<String, dynamic>;
       final fiatAmount = (jsonBody['fiat_amount'] as num?)?.toDouble();
-      final feePercentage = jsonBody['fee_percentage'] as int?;
       final makerId = jsonBody['maker_id'] as String?;
 
-      if (fiatAmount == null || feePercentage == null || makerId == null) {
+      if (fiatAmount == null ||  makerId == null) {
         return Response.badRequest(
             body: jsonEncode({
           'error':
@@ -107,7 +106,6 @@ class ApiService {
       }
       final result = await _coordinatorService.initiateOfferFiat(
         fiatAmount: fiatAmount,
-        feePercentage: feePercentage,
         makerId: makerId,
       );
       return Response.ok(jsonEncode(result),
