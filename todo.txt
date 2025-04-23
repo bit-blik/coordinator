@@ -1,8 +1,8 @@
-- show details of invoice to pay (amount in sats + fees)
 - bad blik code on screen waiting for confirmation
-- comma instead of dot for Polish locale
 - add 10min expiration time for offers
 - sign the api requests with priv key
+- show details of invoice to pay (amount in sats + fees)
+- comma instead of dot for Polish locale
 
 - new offer status (settlingTakerInvoice), and handle it on taker screen showing payment in progress
 
