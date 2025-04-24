@@ -1,9 +1,10 @@
+import 'dart:io';
 import 'package:postgres/postgres.dart';
 import '../models/offer.dart';
 
-// TODO: Load connection details securely (e.g., from environment variables)
-final _dbHost = '192.168.1.18';
-final _dbPort = 5434;
+// Load connection details from environment variables, defaulting to localhost and 5432
+final _dbHost = Platform.environment['DB_HOST'] ?? 'localhost';
+final _dbPort = int.tryParse(Platform.environment['DB_PORT'] ?? '') ?? 5432;
 final _dbName = 'bitblik_db';
 final _dbUser = 'user'; // Replace with your DB user
 final _dbPassword = 'password'; // Replace with your DB password
@@ -311,7 +312,7 @@ class DatabaseService {
       status: OfferStatus.values.byName(map['status']),
       createdAt: (map['created_at'] as DateTime).toLocal(),
       fiatAmount: double.parse(map['fiat_amount']),
-      fiatCurrency: map['fiat_currency']?? '?',
+      fiatCurrency: map['fiat_currency'] ?? '?',
     )
       ..takerPubkey = map['taker_pubkey']
       ..takerLightningAddress = map['taker_lightning_address']

@@ -6,7 +6,9 @@
 
 - new offer status (settlingTakerInvoice), and handle it on taker screen showing payment in progress
 
-- dart theme
+- sound effects when status changes
+- dark theme
+
 - NWC wallet integration
 - fidelity bond for taker
 - backup of keys

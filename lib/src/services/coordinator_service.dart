@@ -53,6 +53,8 @@ class CoordinatorService {
   final Map<String, Timer> _reservationTimers = {};
   // Map to hold active BLIK confirmation timers (120s)
   final Map<String, Timer> _blikConfirmationTimers = {};
+  // Map to hold active funded offer expiration timers (10min)
+  final Map<String, Timer> _fundedOfferTimers = {};
 
   final double kFeePercentage = 0.5;
 
@@ -61,10 +63,58 @@ class CoordinatorService {
   Future<void> init() async {
     // Initialize dependencies if needed (DB and LND connections are handled separately)
     print('CoordinatorService initialized.');
+    await _checkExpiredFundedOffers();
     await _checkExpiredReservations();
     await _checkExpiredBlikConfirmations(); // Add check for BLIK confirmation timeouts
     // TODO: Implement logic to potentially resume listening for pending offers on startup
   }
+
+  // --- Startup Check for Expired Funded Offers ---
+  Future<void> _checkExpiredFundedOffers() async {
+    print('Checking for expired funded offers on startup...');
+    try {
+      final fundedOffers =
+          await _dbService.getOffersByStatus(OfferStatus.funded, limit: 1000);
+      final now = DateTime.now().toUtc();
+      const expirationDuration = Duration(minutes: 10);
+
+      int cancelledCount = 0;
+      for (final offer in fundedOffers) {
+        final createdAt = offer.createdAt;
+        if (createdAt != null) {
+          final expiryTime = createdAt.add(expirationDuration);
+          if (now.isAfter(expiryTime)) {
+            print(
+                'Offer ${offer.id} funded expired (created at $createdAt, expired at $expiryTime). Cancelling.');
+            try {
+              final paymentHashBytes = hexToBytes(offer.holdInvoicePaymentHash);
+              await _lndService.cancelInvoice(paymentHashBytes);
+              print(
+                  'Hold invoice for offer ${offer.id} cancelled due to startup expiration check.');
+            } catch (e) {
+              print(
+                  'Error cancelling hold invoice for expired offer ${offer.id}: $e');
+            }
+            final dbSuccess = await _dbService.updateOfferStatus(
+                offer.id, OfferStatus.expired);
+            if (dbSuccess) {
+              cancelledCount++;
+              print(
+                  'Offer ${offer.id} status updated to expired in DB due to startup expiration check.');
+            } else {
+              print(
+                  'Failed to update offer ${offer.id} status to expired in DB after startup expiration check.');
+            }
+          }
+        }
+      }
+      print(
+          'Expired funded offer check complete. Marked $cancelledCount offers as expired.');
+    } catch (e) {
+      print('Error during expired funded offer check: $e');
+    }
+  }
+  // --- End Startup Check for Expired Funded Offers ---
 
   // --- Startup Check for Expired Reservations ---
   Future<void> _checkExpiredReservations() async {
@@ -294,6 +344,8 @@ class CoordinatorService {
         fiatCurrency: pendingData['fiatCurrency'],
       );
       await _dbService.createOffer(offer);
+      // Start funded offer expiration timer (10min)
+      _startFundedOfferTimer(offer.id, offer.holdInvoicePaymentHash);
       // Execute simplex notification with sats and fiat info
       final fiatText = offer.fiatAmount != null && offer.fiatCurrency != null
           ? '${offer.fiatAmount!.toStringAsFixed(2)} ${offer.fiatCurrency}'
@@ -309,6 +361,45 @@ class CoordinatorService {
       print('Error creating offer in DB for $paymentHashHex: $e');
     }
   }
+
+  // --- Funded Offer Expiration Timer Logic ---
+  void _startFundedOfferTimer(String offerId, String paymentHash) {
+    _fundedOfferTimers[offerId]?.cancel();
+    print('Starting 10min funded offer expiration timer for offer $offerId');
+    _fundedOfferTimers[offerId] = Timer(const Duration(minutes: 10), () {
+      print('Funded offer expired for offer $offerId');
+      _handleFundedOfferExpiration(offerId, paymentHash);
+      _fundedOfferTimers.remove(offerId);
+    });
+  }
+
+  Future<void> _handleFundedOfferExpiration(
+      String offerId, String paymentHash) async {
+    print('Handling funded offer expiration for offer $offerId');
+    final offer = await _dbService.getOfferById(offerId);
+    if (offer != null && offer.status == OfferStatus.funded) {
+      try {
+        final paymentHashBytes = hexToBytes(paymentHash);
+        await _lndService.cancelInvoice(paymentHashBytes);
+        print('Hold invoice for offer $offerId cancelled due to expiration.');
+      } catch (e) {
+        print('Error cancelling hold invoice for expired offer $offerId: $e');
+      }
+      final dbSuccess =
+          await _dbService.updateOfferStatus(offerId, OfferStatus.expired);
+      if (dbSuccess) {
+        print(
+            'Offer $offerId status updated to expired in DB due to expiration.');
+      } else {
+        print(
+            'Failed to update offer $offerId status to expired in DB after expiration.');
+      }
+    } else {
+      print(
+          'Offer $offerId is no longer funded (current status: ${offer?.status}). No action needed for funded expiration.');
+    }
+  }
+  // --- End Funded Offer Expiration Timer Logic ---
 
   // --- Other API Endpoint Logic ---
 
@@ -371,6 +462,9 @@ class CoordinatorService {
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null || offer.status != OfferStatus.funded) {
       print('Offer $offerId not found or not available for reservation.');
+      _fundedOfferTimers[offerId]
+          ?.cancel(); // Clean up funded timer if transitioning out
+      _fundedOfferTimers.remove(offerId);
       return null; // Return null on failure
     }
 
@@ -388,6 +482,9 @@ class CoordinatorService {
     if (success) {
       print(
           'Offer $offerId reserved successfully, DB timestamp set to $timestampToStore.');
+      _fundedOfferTimers[offerId]
+          ?.cancel(); // Clean up funded timer if transitioning out
+      _fundedOfferTimers.remove(offerId);
       _startReservationTimer(offerId);
       return timestampToStore; // Return the adjusted timestamp on success
     } else {
@@ -487,10 +584,11 @@ class CoordinatorService {
       print('Offer $offerId not found, not reserved, or taker mismatch.');
       return false;
     }
-    final takerInvoice = await _resolveLnurlPay(
-        takerLightningAddress, offer.amountSats);
-    if (takerInvoice==null || takerInvoice.isEmpty) {
-      print('Could not get an invoice for amount ${offer.amountSats} sats for LN address $takerLightningAddress');
+    final takerInvoice =
+        await _resolveLnurlPay(takerLightningAddress, offer.amountSats);
+    if (takerInvoice == null || takerInvoice.isEmpty) {
+      print(
+          'Could not get an invoice for amount ${offer.amountSats} sats for LN address $takerLightningAddress');
       return false;
     }
     print('Offer $offerId not found, not reserved, or taker mismatch.');
@@ -627,8 +725,15 @@ class CoordinatorService {
     }
     if (offer.status != OfferStatus.funded) {
       print('Offer $offerId cannot be cancelled in status ${offer.status}.');
+      _fundedOfferTimers[offerId]
+          ?.cancel(); // Clean up funded timer if transitioning out
+      _fundedOfferTimers.remove(offerId);
       return false; // Can only cancel if funded
     }
+
+    _fundedOfferTimers[offerId]
+        ?.cancel(); // Clean up funded timer if transitioning out
+    _fundedOfferTimers.remove(offerId);
 
     // Attempt to cancel the hold invoice on LND first
     try {
@@ -717,13 +822,12 @@ class CoordinatorService {
             offerId, OfferStatus.takerPaymentFailed);
         return "invalid offer";
       }
-      await _dbService.updateOfferStatus(
-          offerId, OfferStatus.payingTaker);
+      await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
       final paymentStream = _lndService.sendPayment(
         takerInvoice,
         expectedAmountSat: offer.amountSats,
-        feeLimitSat: 10,
+        feeLimitSat: offer.feeSats + 100,
       );
       bool paymentSucceeded = false;
       await for (final paymentUpdate in paymentStream) {
