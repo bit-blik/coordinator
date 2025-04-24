@@ -51,6 +51,7 @@ class DatabaseService {
         taker_pubkey TEXT,
         taker_lightning_address TEXT,
         taker_invoice TEXT,
+        taker_invoice_fees BIGINT,
         blik_code TEXT,
         hold_invoice_payment_hash TEXT UNIQUE NOT NULL,
         hold_invoice_preimage TEXT NOT NULL,
@@ -147,6 +148,20 @@ class DatabaseService {
       substitutionValues: {
         'id': id,
         'taker_invoice': takerInvoice,
+        'updated_at': now,
+      },
+    );
+    return affectedRows == 1;
+  }
+
+  Future<bool> updateTakerInvoiceFees(String id, int fees) async {
+    if (_connection == null) throw StateError('Database not connected.');
+    final now = DateTime.now().toUtc();
+    final affectedRows = await _connection!.execute(
+      'UPDATE offers SET taker_invoice_fees = @fees, updated_at = @updated_at WHERE id = @id',
+      substitutionValues: {
+        'id': id,
+        'fees': fees,
         'updated_at': now,
       },
     );
@@ -317,6 +332,7 @@ class DatabaseService {
       ..takerPubkey = map['taker_pubkey']
       ..takerLightningAddress = map['taker_lightning_address']
       ..takerInvoice = map['taker_invoice']
+      ..takerInvoiceFees = map['taker_invoice_fees']
       ..blikCode = map['blik_code']
       ..updatedAt = (map['updated_at'] as DateTime?)?.toLocal()
       ..reservedAt = (map['reserved_at'] as DateTime?)?.toLocal()

@@ -130,8 +130,6 @@ class LndService {
     return await _invoicesClient!.cancelInvoice(request);
   }
 
-  // TODO: Implement sendPayment using _routerClient.sendPaymentV2 or _lightningClient.sendPaymentSync
-  // sendPaymentV2 is generally preferred for better feedback
   Stream<Payment> sendPayment(String paymentRequest,
       {required int expectedAmountSat,
       int? timeoutSeconds,

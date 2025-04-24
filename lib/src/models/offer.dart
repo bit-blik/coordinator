@@ -33,6 +33,7 @@ class Offer {
   DateTime? blikReceivedAt; // Timestamp when BLIK was received
   String? takerLightningAddress; // Store taker's LN address
   String? takerInvoice; // Store the invoice generated from LNURL-pay
+  int? takerInvoiceFees; // Store the fees for taker's invoice
   DateTime? makerConfirmedAt; // Timestamp when maker confirmed payment
   DateTime? settledAt; // Timestamp when hold invoice was settled
   DateTime? takerPaidAt; // Timestamp when taker was paid
@@ -57,6 +58,7 @@ class Offer {
     this.blikReceivedAt,
     this.takerLightningAddress,
     this.takerInvoice,
+    this.takerInvoiceFees,
     this.makerConfirmedAt,
     this.settledAt,
     this.takerPaidAt,

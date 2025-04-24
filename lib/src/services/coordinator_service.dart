@@ -834,6 +834,13 @@ class CoordinatorService {
         if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
           print('Successfully paid taker for offer $offerId.');
           await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid);
+          // Update taker invoice fees from the payment update
+          if (paymentUpdate.feeSat != null) {
+            await _dbService.updateTakerInvoiceFees(
+                offerId, paymentUpdate.feeSat!.toInt());
+            print(
+                'Updated taker invoice fees to ${paymentUpdate.feeSat} sats for offer $offerId.');
+          }
           paymentSucceeded = true;
           return null;
         } else if (paymentUpdate.status == Payment_PaymentStatus.FAILED) {
