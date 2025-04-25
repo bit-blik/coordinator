@@ -1,7 +1,9 @@
 - bad blik code on screen waiting for confirmation
+- better details on MakerSuccessScreen
 - sign the api requests with priv key
 - show details of invoice to pay (amount in sats + fees)
 - comma instead of dot for Polish locale
+- WebLN for paying invoice with Alby extension
 
 - new offer status (payingTaker), and handle it on taker screen showing payment in progress
 

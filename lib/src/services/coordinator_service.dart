@@ -81,30 +81,28 @@ class CoordinatorService {
       int cancelledCount = 0;
       for (final offer in fundedOffers) {
         final createdAt = offer.createdAt;
-        if (createdAt != null) {
-          final expiryTime = createdAt.add(expirationDuration);
-          if (now.isAfter(expiryTime)) {
+        final expiryTime = createdAt.add(expirationDuration);
+        if (now.isAfter(expiryTime)) {
+          print(
+              'Offer ${offer.id} funded expired (created at $createdAt, expired at $expiryTime). Cancelling.');
+          try {
+            final paymentHashBytes = hexToBytes(offer.holdInvoicePaymentHash);
+            await _lndService.cancelInvoice(paymentHashBytes);
             print(
-                'Offer ${offer.id} funded expired (created at $createdAt, expired at $expiryTime). Cancelling.');
-            try {
-              final paymentHashBytes = hexToBytes(offer.holdInvoicePaymentHash);
-              await _lndService.cancelInvoice(paymentHashBytes);
-              print(
-                  'Hold invoice for offer ${offer.id} cancelled due to startup expiration check.');
-            } catch (e) {
-              print(
-                  'Error cancelling hold invoice for expired offer ${offer.id}: $e');
-            }
-            final dbSuccess = await _dbService.updateOfferStatus(
-                offer.id, OfferStatus.expired);
-            if (dbSuccess) {
-              cancelledCount++;
-              print(
-                  'Offer ${offer.id} status updated to expired in DB due to startup expiration check.');
-            } else {
-              print(
-                  'Failed to update offer ${offer.id} status to expired in DB after startup expiration check.');
-            }
+                'Hold invoice for offer ${offer.id} cancelled due to startup expiration check.');
+          } catch (e) {
+            print(
+                'Error cancelling hold invoice for expired offer ${offer.id}: $e');
+          }
+          final dbSuccess =
+              await _dbService.updateOfferStatus(offer.id, OfferStatus.expired);
+          if (dbSuccess) {
+            cancelledCount++;
+            print(
+                'Offer ${offer.id} status updated to expired in DB due to startup expiration check.');
+          } else {
+            print(
+                'Failed to update offer ${offer.id} status to expired in DB after startup expiration check.');
           }
         }
       }
@@ -347,9 +345,7 @@ class CoordinatorService {
       // Start funded offer expiration timer (10min)
       _startFundedOfferTimer(offer.id, offer.holdInvoicePaymentHash);
       // Execute simplex notification with sats and fiat info
-      final fiatText = offer.fiatAmount != null && offer.fiatCurrency != null
-          ? '${offer.fiatAmount!.toStringAsFixed(2)} ${offer.fiatCurrency}'
-          : 'N/A';
+      final fiatText = '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final simplexMsg =
           '#bitblik_3 new offer: ${offer.amountSats} sats (${fiatText}) at https://bitblik.app/#/offers';
       final result = await run('simplex-chat -e "$simplexMsg"');
@@ -835,12 +831,10 @@ class CoordinatorService {
           print('Successfully paid taker for offer $offerId.');
           await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid);
           // Update taker invoice fees from the payment update
-          if (paymentUpdate.feeSat != null) {
-            await _dbService.updateTakerInvoiceFees(
-                offerId, paymentUpdate.feeSat!.toInt());
-            print(
-                'Updated taker invoice fees to ${paymentUpdate.feeSat} sats for offer $offerId.');
-          }
+          await _dbService.updateTakerInvoiceFees(
+              offerId, paymentUpdate.feeSat.toInt());
+          print(
+              'Updated taker invoice fees to ${paymentUpdate.feeSat} sats for offer $offerId.');
           paymentSucceeded = true;
           return null;
         } else if (paymentUpdate.status == Payment_PaymentStatus.FAILED) {
