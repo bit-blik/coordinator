@@ -290,7 +290,6 @@ class DatabaseService {
     final activeStatuses = [
       OfferStatus.created.name,
       OfferStatus.funded.name,
-      OfferStatus.published.name,
       OfferStatus.reserved.name,
       OfferStatus.blikReceived.name,
       OfferStatus.blikSentToMaker.name,

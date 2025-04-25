@@ -3,18 +3,22 @@ import 'package:uuid/uuid.dart';
 enum OfferStatus {
   created, // Initial state, invoice generated but not paid
   funded, // Hold invoice paid by maker, offer listed
-  published, // (Optional) Offer announced via Nostr/other
+
+  expired, // Offer timed out (e.g., reservation, BLIK confirmation)
+  cancelled, // Offer explicitly cancelled by Maker while in 'funded' state
+
   reserved, // Taker has expressed interest, 15s timer started
   blikReceived, // Taker submitted BLIK, 120s timer started
   blikSentToMaker, // Maker requested BLIK code
+
+  invalidBlik, // Maker marked the BLIK code as invalid
+
   makerConfirmed, // Maker confirmed BLIK payment success
   settled, // Hold invoice settled by coordinator
+
   payingTaker, // Taker is being paid
-  takerPaid, // Taker successfully paid via LNURL-pay
-  expired, // Offer timed out (e.g., reservation, BLIK confirmation)
-  cancelled, // Offer explicitly cancelled by Maker while in 'funded' state
-  failed, // Irrecoverable error during the process
   takerPaymentFailed, // Settled, but LNURL payment to taker failed
+  takerPaid, // Taker successfully paid via LNURL-pay
 }
 
 class Offer {

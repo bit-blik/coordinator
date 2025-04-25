@@ -1,21 +1,27 @@
+- fix expiration to funded/expire when NOT in reserve state!!!!!!!!!!!
+
+- new offer status (payingTaker), and handle it on taker screen showing payment in progress
 - bad blik code on screen waiting for confirmation
 - better details on MakerSuccessScreen
-- sign the api requests with priv key
 - show details of invoice to pay (amount in sats + fees)
 - comma instead of dot for Polish locale
 - WebLN for paying invoice with Alby extension
+- save the failed payment reason (could not get an invoice from lnurl/ no route /??)
 
-- new offer status (payingTaker), and handle it on taker screen showing payment in progress
+
+- stats like https://plebqr.com/ for coordinator
 
 - sound effects when status changes
 - dark theme
 
+- extract common code between coordinator & client (offer model)
+
+- sign the api requests with priv key
 - NWC wallet integration
 - fidelity bond for taker
 - backup of keys
 - re-generate new keys
 - other options except simplex (element/webpushs/telegram bot?)
-- save the failed payment reason (could not get an invoice from lnurl/ no route /??)
 
 - refactor to use websockets / nostr
 - why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
