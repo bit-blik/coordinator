@@ -1,4 +1,3 @@
-- fix expiration to funded/expire when NOT in reserve state!!!!!!!!!!!
 - 0.5% fees for taker as well
 
 - new offer status (payingTaker), and handle it on taker screen showing payment in progress
