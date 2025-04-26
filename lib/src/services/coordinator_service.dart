@@ -49,7 +49,7 @@ class CoordinatorService {
   final Map<String, Map<String, dynamic>> _pendingOffers = {};
   // Map to hold active subscriptions for cancellation
   final Map<String, StreamSubscription> _invoiceSubscriptions = {};
-  // Map to hold active reservation timers (15s) for cancellation
+  // Map to hold active reservation timers (20s) for cancellation
   final Map<String, Timer> _reservationTimers = {};
   // Map to hold active BLIK confirmation timers (120s)
   final Map<String, Timer> _blikConfirmationTimers = {};
@@ -547,8 +547,7 @@ class CoordinatorService {
         '### COORDINATOR: Handling BLIK confirmation timeout for offer $offerId'); // Added prominent log
     final offer = await _dbService.getOfferById(offerId);
     if (offer != null &&
-        (offer.status == OfferStatus.blikReceived ||
-            offer.status == OfferStatus.blikSentToMaker)) {
+        (offer.status == OfferStatus.blikReceived)) {
       print(
           'Offer $offerId BLIK confirmation timed out. Reverting status to funded.');
       final success = await _dbService.updateOfferStatus(
@@ -633,6 +632,8 @@ class CoordinatorService {
       } else {
         print('Offer $offerId status updated to blikSentToMaker.');
       }
+      _blikConfirmationTimers[offerId]?.cancel();
+      _blikConfirmationTimers.remove(offerId);
     } catch (e) {
       print('Error updating offer $offerId status to blikSentToMaker: $e');
     }
