@@ -12,10 +12,19 @@ import '../generated/lnd/lightning.pb.dart'; // Contains Invoice and Invoice_Inv
 // Contains Payment and Payment_PaymentStatus
 import 'dart:async'; // For StreamSubscription, Timer
 import 'package:process_run/process_run.dart';
+import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
+import 'dart:io' show Platform; // To read environment variables
 
 class CoordinatorService {
   final DatabaseService _dbService;
   final LndService _lndService;
+  matrix.Client? _matrixClient; // Matrix client instance
+
+  final String _matrixHomeserver =
+      Platform.environment['MATRIX_HOMESERVER'] ?? 'https://matrix.org';
+  final String _matrixUser = Platform.environment['MATRIX_USER'] ?? '';
+  final String _matrixPassword = Platform.environment['MATRIX_PASSWORD'] ?? '';
+  final String _matrixRoomId = Platform.environment['MATRIX_ROOM'] ?? '';
 
   // CoinGecko rate cache
   double? _cachedPlnRate;
@@ -64,11 +73,45 @@ class CoordinatorService {
   Future<void> init() async {
     // Initialize dependencies if needed (DB and LND connections are handled separately)
     print('CoordinatorService initialized.');
+    await _initializeMatrixClient(); // Initialize Matrix client
     await _checkExpiredFundedOffers();
     await _checkExpiredReservations();
     await _checkExpiredBlikConfirmations(); // Add check for BLIK confirmation timeouts
     // TODO: Implement logic to potentially resume listening for pending offers on startup
   }
+
+  // --- Matrix Client Initialization ---
+  Future<void> _initializeMatrixClient() async {
+    if (_matrixUser.isEmpty ||
+        _matrixPassword.isEmpty ||
+        _matrixRoomId.isEmpty) {
+      print(
+          'Matrix credentials or Room ID not configured. Skipping Matrix initialization.');
+      return;
+    }
+    try {
+      print(
+          'Initializing Matrix client for $_matrixUser on $_matrixHomeserver...');
+      _matrixClient = matrix.Client(
+        'BitBlikCoordinator',
+        // No homeserver specified here
+      );
+      await _matrixClient!.init();
+      final loginResponse = await _matrixClient!.login(
+
+        matrix.LoginType.mLoginPassword,
+        identifier: matrix.AuthenticationUserIdentifier(user: _matrixUser),
+        password: _matrixPassword,
+        // No homeserver specified here either
+      );
+      print(
+          'Matrix client logged in successfully as ${loginResponse.userId.localpart}');
+    } catch (e) {
+      print('Error initializing or logging in Matrix client: $e');
+      _matrixClient = null; // Ensure client is null on error
+    }
+  }
+  // --- End Matrix Client Initialization ---
 
   // --- Startup Check for Expired Funded Offers ---
   Future<void> _checkExpiredFundedOffers() async {
@@ -232,7 +275,8 @@ class CoordinatorService {
     final btcPerPln = 1 / rate;
     final btcAmount = fiatAmount * btcPerPln;
     final satsAmount = (btcAmount * 100000000).round();
-    final makerFees = (satsAmount * kMakerFeePercentage / 100).ceil(); // Renamed
+    final makerFees =
+        (satsAmount * kMakerFeePercentage / 100).ceil(); // Renamed
     final totalAmountSats = satsAmount + makerFees; // Renamed
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
@@ -348,12 +392,35 @@ class CoordinatorService {
       // Execute simplex notification with sats and fiat info
       final fiatText =
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
+      final notificationText = "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
       final simplexMsg =
-          "#'Bitblik new offers' New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
+          "#'Bitblik new offers' $notificationText";
       final result = await run('simplex-chat -e "$simplexMsg"');
       if (result.first.stderr.isNotEmpty) {
         print('simplex command error: ${result.first.stderr}');
       }
+
+      // Send Matrix notification
+      if (_matrixClient != null && _matrixClient!.isLogged()) {
+        try {
+          print('Sending Matrix notification to room $_matrixRoomId');
+          // Get the Room object first
+          final room = _matrixClient!.getRoomById(_matrixRoomId);
+          if (room == null) {
+            print('Error: Could not find Matrix room $_matrixRoomId');
+          } else {
+            // Send the event using the Room object's sendTextEvent method
+            await room.sendTextEvent(notificationText);
+            print('Matrix notification sent successfully.');
+          }
+        } catch (e) {
+          print('Error sending Matrix notification: $e');
+        }
+      } else {
+        print(
+            'Matrix client not initialized or not logged in. Skipping notification.');
+      }
+
       print('Offer ${offer.id} created successfully in DB.');
     } catch (e) {
       print('Error creating offer in DB for $paymentHashHex: $e');
@@ -838,7 +905,8 @@ class CoordinatorService {
       await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
       // Calculate taker fees (0.5% of the original offer amount)
-      final takerFees = (offer.amountSats * kTakerFeePercentage /100).ceil(); // Renamed
+      final takerFees =
+          (offer.amountSats * kTakerFeePercentage / 100).ceil(); // Renamed
       final netAmountSats = offer.amountSats - takerFees; // Renamed
       print(
           'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.'); // Renamed

@@ -19,6 +19,9 @@ dependencies:
   http: ^1.2.1 # Added for making HTTP requests (LNURL)
   shelf_cors_headers: ^0.1.5 # For adding CORS headers
   process_run: ^1.2.4 # For running shell commands
+  matrix: ^0.39.1
+  #flutter_olm: ^2.0.0
+  #flutter_openssl_crypto: ^0.5.0
   # path: ^1.8.0
 
 dev_dependencies:

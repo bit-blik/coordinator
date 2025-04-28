@@ -13,3 +13,5 @@ build/
 bin/server
 /.idea/
 /.vscode/
+/.flutter-plugins
+/.flutter-plugins-dependencies
