@@ -231,8 +231,8 @@ class CoordinatorService {
     final btcPerPln = 1 / rate;
     final btcAmount = fiatAmount * btcPerPln;
     final satsAmount = (btcAmount * 100000000).round();
-    final feeSats = (satsAmount * kFeePercentage / 100).ceil();
-    final totalAmountSats = satsAmount + feeSats;
+    final makerFees = (satsAmount * kFeePercentage / 100).ceil(); // Renamed
+    final totalAmountSats = satsAmount + makerFees; // Renamed
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
     final paymentHashHex = paymentHash
@@ -246,7 +246,7 @@ class CoordinatorService {
         preimage.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join('');
     _pendingOffers[paymentHashHex] = {
       'amountSats': satsAmount,
-      'feeSats': feeSats,
+      'makerFees': makerFees, // Renamed
       'makerId': makerId,
       'preimageHex': preimageHex,
       'fiatAmount': fiatAmount,
@@ -260,7 +260,7 @@ class CoordinatorService {
       'fiatAmount': fiatAmount,
       'fiatCurrency': fiatCurrency,
       'amountSats': satsAmount,
-      'feeSats': feeSats,
+      'makerFees': makerFees, // Renamed
       'totalAmountSats': totalAmountSats,
       'rate': rate,
     };
@@ -333,7 +333,7 @@ class CoordinatorService {
     try {
       final offer = Offer(
         amountSats: pendingData['amountSats'],
-        feeSats: pendingData['feeSats'],
+        makerFees: pendingData['makerFees'], // Renamed
         makerPubkey: pendingData['makerId'],
         holdInvoicePaymentHash: paymentHashHex,
         holdInvoicePreimage: pendingData['preimageHex'],
@@ -345,7 +345,8 @@ class CoordinatorService {
       // Start funded offer expiration timer (10min)
       _startFundedOfferTimer(offer.id, offer.holdInvoicePaymentHash);
       // Execute simplex notification with sats and fiat info
-      final fiatText = '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
+      final fiatText =
+          '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final simplexMsg =
           '#bitblik_3 new offer: ${offer.amountSats} sats (${fiatText}) at https://bitblik.app/#/offers';
       final result = await run('simplex-chat -e "$simplexMsg"');
@@ -420,7 +421,7 @@ class CoordinatorService {
       return {
         'id': offer.id,
         'amount_sats': offer.amountSats,
-        'fee_sats': offer.feeSats,
+        'maker_fees': offer.makerFees, // Renamed
         'fiat_amount': offer.fiatAmount,
         'fiat_currency': offer.fiatCurrency,
         'status': offer.status.name, // Return actual status
@@ -429,6 +430,7 @@ class CoordinatorService {
             offer.reservedAt?.toIso8601String(), // Include reserved_at
         'blik_received_at':
             offer.blikReceivedAt?.toIso8601String(), // Include blik_received_at
+        'taker_fees': offer.takerFees, // Renamed
         // hold_invoice_payment_hash is intentionally omitted from this list endpoint
       };
     }).toList();
@@ -546,8 +548,7 @@ class CoordinatorService {
     print(
         '### COORDINATOR: Handling BLIK confirmation timeout for offer $offerId'); // Added prominent log
     final offer = await _dbService.getOfferById(offerId);
-    if (offer != null &&
-        (offer.status == OfferStatus.blikReceived)) {
+    if (offer != null && (offer.status == OfferStatus.blikReceived)) {
       print(
           'Offer $offerId BLIK confirmation timed out. Reverting status to funded.');
       final success = await _dbService.updateOfferStatus(
@@ -579,11 +580,19 @@ class CoordinatorService {
       print('Offer $offerId not found, not reserved, or taker mismatch.');
       return false;
     }
+
+    // Calculate net amount after taker fees
+    final takerFees = (offer.amountSats * 0.005).ceil(); // Renamed
+    final netAmountSats = offer.amountSats - takerFees; // Renamed
+    print(
+        'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)'); // Renamed
+
+    // Resolve LNURL with the net amount
     final takerInvoice =
-        await _resolveLnurlPay(takerLightningAddress, offer.amountSats);
+        await _resolveLnurlPay(takerLightningAddress, netAmountSats);
     if (takerInvoice == null || takerInvoice.isEmpty) {
       print(
-          'Could not get an invoice for amount ${offer.amountSats} sats for LN address $takerLightningAddress');
+          'Could not get an invoice for net amount $netAmountSats sats for LN address $takerLightningAddress');
       return false;
     }
     print('Offer $offerId not found, not reserved, or taker mismatch.');
@@ -781,13 +790,19 @@ class CoordinatorService {
       return;
     }
 
+    // Calculate net amount after taker fees
+    final takerFees = (offer.amountSats * 0.005).ceil(); // Renamed
+    final netAmountSats = offer.amountSats - takerFees; // Renamed
     print(
-        'Async: Attempting to pay taker via LNURL: ${offer.takerLightningAddress} for ${offer.amountSats} sats');
+        'Async: Attempting to pay taker via LNURL: ${offer.takerLightningAddress} for net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)'); // Renamed
+
     try {
-      final takerInvoice = await _resolveLnurlPay(
-          offer.takerLightningAddress!, offer.amountSats);
+      // Resolve LNURL with the net amount
+      final takerInvoice =
+          await _resolveLnurlPay(offer.takerLightningAddress!, netAmountSats);
       if (takerInvoice == null) {
-        print('Async Error: Failed to resolve LNURL for offer $offerId.');
+        print(
+            'Async Error: Failed to resolve LNURL for net amount $netAmountSats for offer $offerId.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
         return;
@@ -821,17 +836,26 @@ class CoordinatorService {
       }
       await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
+      // Calculate taker fees (0.5% of the original offer amount)
+      final takerFees = (offer.amountSats * 0.005).ceil(); // Renamed
+      final netAmountSats = offer.amountSats - takerFees; // Renamed
+      print(
+          'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.'); // Renamed
+
+      // Pay the NET amount
       final paymentStream = _lndService.sendPayment(
         takerInvoice,
-        expectedAmountSat: offer.amountSats,
-        feeLimitSat: offer.feeSats + 100,
+        expectedAmountSat: netAmountSats, // Pay the NET amount
+        feeLimitSat: offer.makerFees + 100, // Renamed
       );
       bool paymentSucceeded = false;
       await for (final paymentUpdate in paymentStream) {
         if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
           print('Successfully paid taker for offer $offerId.');
-          await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid);
-          // Update taker invoice fees from the payment update
+          // Update status and store the calculated taker fees
+          await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
+              takerFees: takerFees); // Renamed parameter
+          // Update taker invoice fees (routing fees paid by coordinator)
           await _dbService.updateTakerInvoiceFees(
               offerId, paymentUpdate.feeSat.toInt());
           print(
@@ -902,8 +926,9 @@ class CoordinatorService {
   }
 
   // --- LNURL Pay Resolution Helper ---
+  // Takes the NET amount the taker should receive
   Future<String?> _resolveLnurlPay(
-      String lightningAddress, int amountSats) async {
+      String lightningAddress, int netAmountSats) async {
     try {
       if (!lightningAddress.contains('@')) {
         print('Invalid Lightning Address format: $lightningAddress');
@@ -939,10 +964,11 @@ class CoordinatorService {
             'LNURL Error: Missing required fields (callback, min/maxSendable) in step 1 for $lightningAddress');
         return null;
       }
-      final amountMsats = amountSats * 1000;
+      // Use net amount for LNURL request
+      final amountMsats = netAmountSats * 1000;
       if (amountMsats < minSendable || amountMsats > maxSendable) {
         print(
-            'LNURL Error: Amount $amountSats sats ($amountMsats msats) is outside acceptable range ($minSendable - $maxSendable msats) for $lightningAddress');
+            'LNURL Error: Net amount $netAmountSats sats ($amountMsats msats) is outside acceptable range ($minSendable - $maxSendable msats) for $lightningAddress');
         return null;
       }
       final callbackUri = Uri.parse(callbackUrl);

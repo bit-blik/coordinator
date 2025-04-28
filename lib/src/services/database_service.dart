@@ -46,7 +46,7 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS offers (
         id UUID PRIMARY KEY,
         amount_sats BIGINT NOT NULL,
-        fee_sats BIGINT NOT NULL,
+        maker_fees BIGINT NOT NULL, -- Renamed
         maker_pubkey TEXT NOT NULL,
         taker_pubkey TEXT,
         taker_lightning_address TEXT,
@@ -63,6 +63,7 @@ class DatabaseService {
         maker_confirmed_at TIMESTAMPTZ,
         settled_at TIMESTAMPTZ,
         taker_paid_at TIMESTAMPTZ,
+        taker_fees BIGINT NULL, -- Renamed
         fiat_amount NUMERIC,
         fiat_currency TEXT
       );
@@ -85,13 +86,13 @@ class DatabaseService {
     final now = DateTime.now().toUtc();
     await _connection!.execute(
       '''
-        INSERT INTO offers (id, amount_sats, fee_sats, maker_pubkey, hold_invoice_payment_hash, hold_invoice_preimage, status, created_at, updated_at, fiat_amount, fiat_currency)
-        VALUES (@id, @amount_sats, @fee_sats, @maker_pubkey, @hold_invoice_payment_hash, @hold_invoice_preimage, @status, @created_at, @updated_at, @fiat_amount, @fiat_currency)
+        INSERT INTO offers (id, amount_sats, maker_fees, maker_pubkey, hold_invoice_payment_hash, hold_invoice_preimage, status, created_at, updated_at, fiat_amount, fiat_currency)
+        VALUES (@id, @amount_sats, @maker_fees, @maker_pubkey, @hold_invoice_payment_hash, @hold_invoice_preimage, @status, @created_at, @updated_at, @fiat_amount, @fiat_currency)
       ''',
       substitutionValues: {
         'id': offer.id,
         'amount_sats': offer.amountSats,
-        'fee_sats': offer.feeSats,
+        'maker_fees': offer.makerFees, // Renamed
         'maker_pubkey': offer.makerPubkey,
         'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
         'hold_invoice_preimage': offer.holdInvoicePreimage,
@@ -175,9 +176,11 @@ class DatabaseService {
       {String? takerPubkey,
       String? blikCode,
       String? takerLightningAddress,
-      DateTime? reservedAt, // Added parameter
-      DateTime? blikReceivedAt}) async {
-    // Added parameter
+      DateTime? reservedAt,
+      DateTime? blikReceivedAt,
+      int? takerFees}) async {
+    // Renamed parameter
+    // Added takerFees
     if (_connection == null) throw StateError('Database not connected.');
     final now = DateTime.now().toUtc(); // Keep 'now' for updated_at
     Map<String, dynamic> params = {
@@ -225,8 +228,16 @@ class DatabaseService {
         setClauses.add('settled_at = @settled_at');
         break;
       case OfferStatus.takerPaid:
+        if (takerFees == null) {
+          // Renamed check
+          // Optionally throw an error, or just log a warning if fees are expected
+          print(
+              'Warning: Updating status to takerPaid without providing takerFees for offer $id');
+        }
         params['taker_paid_at'] = now;
+        params['taker_fees'] = takerFees; // Renamed parameter and column
         setClauses.add('taker_paid_at = @taker_paid_at');
+        setClauses.add('taker_fees = @taker_fees'); // Renamed column
         break;
       case OfferStatus.funded: // Explicitly handle reverting to funded
       case OfferStatus.expired:
@@ -319,7 +330,7 @@ class DatabaseService {
     return Offer(
       id: map['id'],
       amountSats: map['amount_sats'],
-      feeSats: map['fee_sats'],
+      makerFees: map['maker_fees'], // Renamed field and column
       makerPubkey: map['maker_pubkey'],
       holdInvoicePaymentHash: map['hold_invoice_payment_hash'],
       holdInvoicePreimage: map['hold_invoice_preimage'],
@@ -338,6 +349,7 @@ class DatabaseService {
       ..blikReceivedAt = (map['blik_received_at'] as DateTime?)?.toLocal()
       ..makerConfirmedAt = (map['maker_confirmed_at'] as DateTime?)?.toLocal()
       ..settledAt = (map['settled_at'] as DateTime?)?.toLocal()
-      ..takerPaidAt = (map['taker_paid_at'] as DateTime?)?.toLocal();
+      ..takerPaidAt = (map['taker_paid_at'] as DateTime?)?.toLocal()
+      ..takerFees = map['taker_fees']; // Renamed field and column
   }
 }

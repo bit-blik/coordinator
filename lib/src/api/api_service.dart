@@ -42,8 +42,7 @@ class ApiService {
         return Response.ok(jsonEncode({'message': 'Taker payment retried'}),
             headers: {'Content-Type': 'application/json'});
       } else {
-        return Response(409,
-            body: jsonEncode({'error': error}));
+        return Response(409, body: jsonEncode({'error': error}));
       }
     } catch (e) {
       print('Error in _retryTakerPaymentHandler: $e');
@@ -97,7 +96,7 @@ class ApiService {
       final fiatAmount = (jsonBody['fiat_amount'] as num?)?.toDouble();
       final makerId = jsonBody['maker_id'] as String?;
 
-      if (fiatAmount == null ||  makerId == null) {
+      if (fiatAmount == null || makerId == null) {
         return Response.badRequest(
             body: jsonEncode({
           'error':
@@ -201,7 +200,7 @@ class ApiService {
                   'Failed to submit BLIK code. Offer state might be invalid or taker mismatch. Also make sure your lightning address is valid and can generate invoice for the amount of offer'
             }));
       }
-    } catch (e,s) {
+    } catch (e, s) {
       print('Error in _submitBlikHandler: $e');
       print('Stack: $s');
       return Response.internalServerError(
@@ -303,7 +302,7 @@ class ApiService {
           final offerMap = {
             'id': offer.id,
             'amount_sats': offer.amountSats,
-            'fee_sats': offer.feeSats,
+            'maker_fees': offer.makerFees, // Renamed
             'maker_pubkey': offer.makerPubkey,
             'taker_pubkey': offer.takerPubkey,
             'taker_lightning_address': offer.takerLightningAddress,
@@ -316,6 +315,7 @@ class ApiService {
             'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
             'fiat_amount': offer.fiatAmount,
             'fiat_currency': offer.fiatCurrency,
+            'taker_fees': offer.takerFees, // Renamed
             // Add other relevant fields if needed by the client (e.g., taker_lightning_address for Maker?)
           };
           // print('[DEBUG] my-active-offer response: $offerMap');
@@ -331,7 +331,7 @@ class ApiService {
           'Content-Type': 'application/json'
         }); // Return empty object
       }
-    } catch (e,s) {
+    } catch (e, s) {
       print('Error in _getMyActiveOfferHandler: $e');
       print('Stack: $s');
       return Response.internalServerError(
@@ -361,7 +361,7 @@ class ApiService {
           .map((offer) => {
                 'id': offer.id,
                 'amount_sats': offer.amountSats,
-                'fee_sats': offer.feeSats,
+                'maker_fees': offer.makerFees, // Renamed
                 'fiat_amount': offer.fiatAmount,
                 'fiat_currency': offer.fiatCurrency,
                 'maker_pubkey': offer.makerPubkey,
@@ -374,6 +374,7 @@ class ApiService {
                 'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
                 'blik_code': offer.blikCode,
                 'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
+                'taker_fees': offer.takerFees, // Renamed
               })
           .toList();
 

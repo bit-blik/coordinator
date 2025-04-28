@@ -24,7 +24,7 @@ enum OfferStatus {
 class Offer {
   final String id;
   final int amountSats;
-  final int feeSats;
+  final int makerFees; // Renamed from feeSats
   final String makerPubkey;
   final String holdInvoicePaymentHash;
   final String holdInvoicePreimage; // Store preimage for settling
@@ -41,6 +41,7 @@ class Offer {
   DateTime? makerConfirmedAt; // Timestamp when maker confirmed payment
   DateTime? settledAt; // Timestamp when hold invoice was settled
   DateTime? takerPaidAt; // Timestamp when taker was paid
+  int? takerFees; // Renamed from takerFeesSats
 
   // Fiat support
   final double fiatAmount;
@@ -49,7 +50,7 @@ class Offer {
   Offer({
     String? id,
     required this.amountSats,
-    required this.feeSats,
+    required this.makerFees, // Renamed from feeSats
     required this.makerPubkey,
     required this.holdInvoicePaymentHash,
     required this.holdInvoicePreimage,
@@ -66,6 +67,7 @@ class Offer {
     this.makerConfirmedAt,
     this.settledAt,
     this.takerPaidAt,
+    this.takerFees, // Renamed from takerFeesSats
     required this.fiatAmount,
     required this.fiatCurrency,
   })  : id = id ?? Uuid().v4(),

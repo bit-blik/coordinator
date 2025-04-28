@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS offers (
   id UUID PRIMARY KEY,
   amount_sats BIGINT NOT NULL,
-  fee_sats BIGINT NOT NULL,
+  maker_fees BIGINT NOT NULL, -- Renamed from fee_sats
   maker_pubkey TEXT NOT NULL,
   taker_pubkey TEXT,
   taker_lightning_address TEXT, -- Added for LNURL payout
@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS offers (
   blik_received_at TIMESTAMPTZ,
   maker_confirmed_at TIMESTAMPTZ,
   settled_at TIMESTAMPTZ,
-  taker_paid_at TIMESTAMPTZ
+  taker_paid_at TIMESTAMPTZ,
+  taker_fees BIGINT NULL -- Renamed from taker_fees_sats
 );
 
 -- Add index for faster lookups by status

@@ -1,11 +1,14 @@
 - 0.5% fees for taker as well
-
+- add language switcher, set based on system language, when switching save it in client storage
 - new offer status (payingTaker), and handle it on taker screen showing payment in progress
+- backup of keys
+
 - bad blik code on screen waiting for confirmation
+- add all other transitions from workflow
+- sign the api requests with priv key
+
 - better details on MakerSuccessScreen
 - show details of invoice to pay (amount in sats + fees)
-- comma instead of dot for Polish locale
-- WebLN for paying invoice with Alby extension
 - save the failed payment reason (could not get an invoice from lnurl/ no route /??)
 
 
@@ -16,10 +19,9 @@
 
 - extract common code between coordinator & client (offer model)
 
-- sign the api requests with priv key
-- NWC wallet integration
 - fidelity bond for taker
-- backup of keys
+- NWC wallet integration
+- WebLN for paying invoice with Alby extension
 - re-generate new keys
 - other options except simplex (element/webpushs/telegram bot?)
 
