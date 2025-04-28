@@ -348,7 +348,7 @@ class CoordinatorService {
       final fiatText =
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final simplexMsg =
-          '#bitblik_3 new offer: ${offer.amountSats} sats (${fiatText}) at https://bitblik.app/#/offers';
+          "#'Bitblik new offers' New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
       final result = await run('simplex-chat -e "$simplexMsg"');
       if (result.first.stderr.isNotEmpty) {
         print('simplex command error: ${result.first.stderr}');
