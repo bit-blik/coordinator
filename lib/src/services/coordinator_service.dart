@@ -56,7 +56,8 @@ class CoordinatorService {
   // Map to hold active funded offer expiration timers (10min)
   final Map<String, Timer> _fundedOfferTimers = {};
 
-  final double kFeePercentage = 0.5;
+  final double kMakerFeePercentage = 0.5;
+  final double kTakerFeePercentage = 0.5;
 
   CoordinatorService(this._dbService, this._lndService);
 
@@ -231,7 +232,7 @@ class CoordinatorService {
     final btcPerPln = 1 / rate;
     final btcAmount = fiatAmount * btcPerPln;
     final satsAmount = (btcAmount * 100000000).round();
-    final makerFees = (satsAmount * kFeePercentage / 100).ceil(); // Renamed
+    final makerFees = (satsAmount * kMakerFeePercentage / 100).ceil(); // Renamed
     final totalAmountSats = satsAmount + makerFees; // Renamed
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
@@ -837,7 +838,7 @@ class CoordinatorService {
       await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
       // Calculate taker fees (0.5% of the original offer amount)
-      final takerFees = (offer.amountSats * 0.005).ceil(); // Renamed
+      final takerFees = (offer.amountSats * kTakerFeePercentage /100).ceil(); // Renamed
       final netAmountSats = offer.amountSats - takerFees; // Renamed
       print(
           'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.'); // Renamed
