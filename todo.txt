@@ -21,7 +21,7 @@
 - NWC wallet integration
 - WebLN for paying invoice with Alby extension
 - re-generate new keys
-- other options except simplex (element/webpushs/telegram bot?)
+- other options except simplex (webpushs/telegram bot?)
 
 - refactor to use websockets / nostr
 - why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
