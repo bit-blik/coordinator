@@ -12,21 +12,20 @@
 - show details of invoice to pay (amount in sats + fees)
 - save the failed payment reason (could not get an invoice from lnurl/ no route /??) and show it on takerFailedPayment screen
 - backup of keys
-- tests
-
-
-- stats like https://plebqr.com/ for coordinator
-
 - sound effects when status changes
-- dark theme
 
-- extract common code between coordinator & client (offer model)
-
+======
 - fidelity bond for taker
 - NWC wallet integration
 - WebLN for paying invoice with Alby extension
 - re-generate new keys
+- refactor to use websockets / nostr
+
+======
+- tests
+- dark theme
+- stats like https://plebqr.com/ for coordinator
+- extract common code between coordinator & client (offer model)
+- why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
 - other options except simplex (webpushs/telegram bot?)
 
-- refactor to use websockets / nostr
-- why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
