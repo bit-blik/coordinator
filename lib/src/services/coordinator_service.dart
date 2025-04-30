@@ -15,6 +15,9 @@ import 'package:process_run/process_run.dart';
 import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
 import 'dart:io' show Platform; // To read environment variables
 
+// Set to Duration.zero for production
+const Duration _kDebugDelayDuration = Duration(seconds: 0);
+
 class CoordinatorService {
   final DatabaseService _dbService;
   final LndService _lndService;
@@ -98,7 +101,6 @@ class CoordinatorService {
       );
       await _matrixClient!.init();
       final loginResponse = await _matrixClient!.login(
-
         matrix.LoginType.mLoginPassword,
         identifier: matrix.AuthenticationUserIdentifier(user: _matrixUser),
         password: _matrixPassword,
@@ -392,9 +394,9 @@ class CoordinatorService {
       // Execute simplex notification with sats and fiat info
       final fiatText =
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
-      final notificationText = "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
-      final simplexMsg =
-          "#'Bitblik new offers' $notificationText";
+      final notificationText =
+          "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
+      final simplexMsg = "#'Bitblik new offers' $notificationText";
       final result = await run('simplex-chat -e "$simplexMsg"');
       if (result.first.stderr.isNotEmpty) {
         print('simplex command error: ${result.first.stderr}');
@@ -749,6 +751,7 @@ class CoordinatorService {
       final preimageBytes = hexToBytes(offer.holdInvoicePreimage);
       await _lndService.settleInvoice(preimageBytes);
       print('Hold invoice for offer $offerId settled successfully.');
+      await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
       success =
           await _dbService.updateOfferStatus(offerId, OfferStatus.settled);
       if (!success) {
@@ -902,6 +905,7 @@ class CoordinatorService {
             offerId, OfferStatus.takerPaymentFailed);
         return "invalid offer";
       }
+      await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
       await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
       // Calculate taker fees (0.5% of the original offer amount)
@@ -921,6 +925,7 @@ class CoordinatorService {
       await for (final paymentUpdate in paymentStream) {
         if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
           print('Successfully paid taker for offer $offerId.');
+          await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
           // Update status and store the calculated taker fees
           await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
               takerFees: takerFees); // Renamed parameter

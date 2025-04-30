@@ -1,13 +1,18 @@
-- new offer status (payingTaker), and handle it on taker screen showing payment in progress
-- backup of keys
-
 - bad blik code on screen waiting for confirmation
 - add all other transitions from workflow
+
+- change expiration of make invoice to 24h
+- settle maker invoice after x hours even if not confirmed so that we can resolve conflict having the sats
+- in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
+- timer countdown of 2min for validity of blik code in both taker/maker screens with info what to do next.
+
 - sign the api requests with priv key
 
 - better details on MakerSuccessScreen
 - show details of invoice to pay (amount in sats + fees)
-- save the failed payment reason (could not get an invoice from lnurl/ no route /??)
+- save the failed payment reason (could not get an invoice from lnurl/ no route /??) and show it on takerFailedPayment screen
+- backup of keys
+- tests
 
 
 - stats like https://plebqr.com/ for coordinator
