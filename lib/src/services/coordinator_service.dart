@@ -801,7 +801,7 @@ class CoordinatorService {
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
         offer.makerPubkey != makerId ||
-        (offer.status != OfferStatus.blikReceived &&
+        (offer.status != OfferStatus.conflict &&
             offer.status != OfferStatus.blikSentToMaker)) {
       print(
           'Offer $offerId not found, maker mismatch, or not in correct state for confirmation.');
