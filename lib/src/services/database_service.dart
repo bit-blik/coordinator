@@ -248,6 +248,10 @@ class DatabaseService {
         setClauses.add('taker_lightning_address = NULL');
         setClauses.add('blik_received_at = NULL');
         break;
+      case OfferStatus.invalidBlik: // Add case for invalidBlik
+      case OfferStatus.conflict: // Add case for conflict
+        // No specific fields to update/clear when moving TO these states
+        break;
       default:
         break;
     }
@@ -296,7 +300,10 @@ class DatabaseService {
 
   // Fetch active offers where the user is either maker or taker
   Future<List<Offer>> getMyActiveOffers(String userPubkey) async {
-    if (_connection == null) throw StateError('Database not connected.');
+    await connect(); // Ensure connection is open
+    if (_connection == null)
+      throw StateError(
+          'Database not connected.'); // Should not happen after connect() but keep for safety
     // Define "active" statuses (exclude terminal/cancelled states)
     final activeStatuses = [
       OfferStatus.created.name,
@@ -304,6 +311,8 @@ class DatabaseService {
       OfferStatus.reserved.name,
       OfferStatus.blikReceived.name,
       OfferStatus.blikSentToMaker.name,
+      OfferStatus.invalidBlik.name,
+      OfferStatus.conflict.name,
       OfferStatus.makerConfirmed.name,
       OfferStatus.payingTaker.name,
       OfferStatus.takerPaymentFailed.name,
