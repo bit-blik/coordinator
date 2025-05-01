@@ -1,19 +1,21 @@
 - transaction to dispute state
 
-- coordinator /admin/* for admin actions on allow pubkeys
 
-- settle maker invoice after 4 hours even if not confirmed so that we can resolve conflict having the sats
-- in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
-- timer countdown of 2min for validity of blik code in both taker/maker screens with info what to do next.
-
-- sign the api requests with priv key
-
-- show coordinator/client version on UI
 - better details on MakerSuccessScreen
 - show details of invoice to pay (amount in sats + fees)
 - save the failed payment reason (could not get an invoice from lnurl/ no route /??) and show it on takerFailedPayment screen
-- backup of keys
+
+- settle maker invoice after 4 hours even if not confirmed so that we can resolve conflict having the sats
+- sign the api requests with priv key
+
+
+- show coordinator/client version on UI
+- timer countdown of 2min for validity of blik code in both taker/maker screens with info what to do next.
+- in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
+- backup/restore keys
+
 - sound effects when status changes
+- coordinator /admin/* for admin actions on allowed pubkeys
 
 ======
 - fidelity bond for taker
