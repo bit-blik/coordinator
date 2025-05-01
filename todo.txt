@@ -10,6 +10,7 @@
 
 - sign the api requests with priv key
 
+- show coordinator/client version on UI
 - better details on MakerSuccessScreen
 - show details of invoice to pay (amount in sats + fees)
 - save the failed payment reason (could not get an invoice from lnurl/ no route /??) and show it on takerFailedPayment screen
