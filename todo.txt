@@ -1,6 +1,8 @@
 - bad blik code on screen waiting for confirmation
 - add all other transitions from workflow
 
+- coordinator /admin/* for admin actions on allow pubkeys
+
 - change expiration of make invoice to 24h
 - settle maker invoice after x hours even if not confirmed so that we can resolve conflict having the sats
 - in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
