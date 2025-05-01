@@ -528,7 +528,9 @@ class CoordinatorService {
   Future<DateTime?> reserveOffer(String offerId, String takerId) async {
     print('Reserving offer $offerId for taker $takerId');
     final offer = await _dbService.getOfferById(offerId);
-    if (offer == null || offer.status != OfferStatus.funded) {
+    if (offer == null ||
+        (offer.status != OfferStatus.funded && offer.status != OfferStatus.invalidBlik) ||
+        (offer.status == OfferStatus.invalidBlik && offer.takerPubkey != takerId)) {
       print('Offer $offerId not found or not available for reservation.');
       _fundedOfferTimers[offerId]
           ?.cancel(); // Clean up funded timer if transitioning out
@@ -719,6 +721,79 @@ class CoordinatorService {
 
     print('Returning BLIK code for offer $offerId to maker.');
     return offer.blikCode;
+  }
+
+  // Method for Maker to mark BLIK as invalid
+  Future<bool> markBlikInvalid(String offerId, String makerId) async {
+    print('Maker $makerId marking BLIK as invalid for offer $offerId');
+    final offer = await _dbService.getOfferById(offerId);
+
+    // 1. Check if offer exists and maker matches
+    if (offer == null || offer.makerPubkey != makerId) {
+      print(
+          'Offer $offerId not found or maker ID mismatch for marking BLIK invalid.');
+      return false;
+    }
+
+    // 2. Check if offer is in a valid state to be marked invalid
+    if (offer.status != OfferStatus.blikReceived &&
+        offer.status != OfferStatus.blikSentToMaker) {
+      print(
+          'Offer $offerId is not in a state where BLIK can be marked invalid (current state: ${offer.status}).');
+      return false;
+    }
+
+    // 3. Cancel the BLIK confirmation timer if active
+    _blikConfirmationTimers[offerId]?.cancel();
+    _blikConfirmationTimers.remove(offerId);
+    print('Cancelled BLIK confirmation timer for offer $offerId (if active).');
+
+    // 4. Update the offer status in the database
+    final success =
+        await _dbService.updateOfferStatus(offerId, OfferStatus.invalidBlik);
+
+    if (success) {
+      print('Offer $offerId status updated to invalidBlik.');
+      // TODO: Potentially notify the Taker that the BLIK was marked invalid.
+    } else {
+      print('Failed to update offer $offerId status to invalidBlik in DB.');
+    }
+
+    return success;
+  }
+
+  // Method for Taker to mark offer as conflict after Maker marked BLIK invalid
+  Future<bool> markOfferConflict(String offerId, String takerId) async {
+    print('Taker $takerId marking offer $offerId as conflict.');
+    final offer = await _dbService.getOfferById(offerId);
+
+    // 1. Check if offer exists and taker matches
+    if (offer == null || offer.takerPubkey != takerId) {
+      print(
+          'Offer $offerId not found or taker ID mismatch for marking conflict.');
+      return false;
+    }
+
+    // 2. Check if offer is in the 'invalidBlik' state
+    if (offer.status != OfferStatus.invalidBlik) {
+      print(
+          'Offer $offerId is not in the invalidBlik state (current state: ${offer.status}). Cannot mark as conflict.');
+      return false;
+    }
+
+    // 3. Update the offer status in the database
+    final success =
+        await _dbService.updateOfferStatus(offerId, OfferStatus.conflict);
+
+    if (success) {
+      print('Offer $offerId status updated to conflict.');
+      // TODO: Implement conflict resolution logic/notification.
+      // Maybe notify the Maker and/or an admin.
+    } else {
+      print('Failed to update offer $offerId status to conflict in DB.');
+    }
+
+    return success;
   }
 
   Future<bool> confirmMakerPayment(String offerId, String makerId) async {

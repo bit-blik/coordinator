@@ -26,6 +26,10 @@ class ApiService {
         '/offers/<offerId>/retry-taker-payment', _retryTakerPaymentHandler);
     _router.delete(
         '/offers/<offerId>/cancel', _cancelOfferHandler); // New cancel endpoint
+    _router.post('/offers/<offerId>/blik-invalid',
+        _markBlikInvalidHandler); // New BLIK invalid endpoint
+    _router.post('/offers/<offerId>/conflict',
+        _markOfferConflictHandler); // New conflict endpoint
   }
 
   Future<Response> _retryTakerPaymentHandler(
@@ -436,6 +440,72 @@ class ApiService {
       return Response.internalServerError(
           body:
               jsonEncode({'error': 'Failed to cancel offer: ${e.toString()}'}));
+    }
+  }
+
+  // Handler for marking BLIK as invalid
+  Future<Response> _markBlikInvalidHandler(
+      Request request, String offerId) async {
+    try {
+      // Extract makerId from header (preferred) or query param
+      final makerId = request.headers['x-maker-id'];
+      if (makerId == null || makerId.isEmpty) {
+        return Response.unauthorized(jsonEncode(
+            {'error': 'Missing maker identification (x-maker-id header)'}));
+      }
+
+      final success =
+          await _coordinatorService.markBlikInvalid(offerId, makerId);
+
+      if (success) {
+        return Response.ok(jsonEncode(
+            {'message': 'BLIK code marked as invalid successfully'}));
+      } else {
+        // Could be 403 Forbidden (wrong maker), 404 Not Found, 409 Conflict (wrong state)
+        return Response(409,
+            body: jsonEncode({
+              'error':
+                  'Failed to mark BLIK as invalid. Offer might be in the wrong state, not found, or maker ID mismatch.'
+            }));
+      }
+    } catch (e) {
+      print('Error in _markBlikInvalidHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode(
+              {'error': 'Failed to mark BLIK as invalid: ${e.toString()}'}));
+    }
+  }
+
+  // Handler for marking offer as conflict
+  Future<Response> _markOfferConflictHandler(
+      Request request, String offerId) async {
+    try {
+      // Extract takerId from header
+      final takerId = request.headers['x-user-pubkey'];
+      if (takerId == null || takerId.isEmpty) {
+        return Response.unauthorized(jsonEncode(
+            {'error': 'Missing user identification (x-user-pubkey header)'}));
+      }
+
+      final success =
+          await _coordinatorService.markOfferConflict(offerId, takerId);
+
+      if (success) {
+        return Response.ok(
+            jsonEncode({'message': 'Offer marked as conflict successfully'}));
+      } else {
+        // Could be 403 Forbidden (wrong taker), 404 Not Found, 409 Conflict (wrong state)
+        return Response(409,
+            body: jsonEncode({
+              'error':
+                  'Failed to mark offer as conflict. Offer might be in the wrong state, not found, or taker ID mismatch.'
+            }));
+      }
+    } catch (e) {
+      print('Error in _markOfferConflictHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode(
+              {'error': 'Failed to mark offer as conflict: ${e.toString()}'}));
     }
   }
 }
