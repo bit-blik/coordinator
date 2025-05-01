@@ -99,7 +99,7 @@ class LndService {
       ..memo = memo
       ..hash = hash // The payment hash (sha256 of preimage)
       ..value = Int64(amountSats) // Use Int64
-      ..expiry = Int64(600); // 10 minutes expiration
+      ..expiry = Int64(86400); // 24 hours expiration
     print('Creating hold invoice: $request');
     return await _invoicesClient!.addHoldInvoice(request);
   }

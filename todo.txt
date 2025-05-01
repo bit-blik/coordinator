@@ -1,9 +1,8 @@
-- add all other transitions from workflow
+- transaction to dispute state
 
 - coordinator /admin/* for admin actions on allow pubkeys
 
-- change expiration of make invoice to 24h
-- settle maker invoice after x hours even if not confirmed so that we can resolve conflict having the sats
+- settle maker invoice after 4 hours even if not confirmed so that we can resolve conflict having the sats
 - in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
 - timer countdown of 2min for validity of blik code in both taker/maker screens with info what to do next.
 
