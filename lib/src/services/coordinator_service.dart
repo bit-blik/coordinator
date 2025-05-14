@@ -1,26 +1,31 @@
-import 'database_service.dart';
-import 'lnd_service.dart';
-import '../models/offer.dart';
-import 'package:crypto/crypto.dart'; // For SHA256
-// import 'dart:convert'; // For utf8 - Removed unused import
+import 'dart:async'; // For StreamSubscription, Timer
+import 'dart:convert'; // For jsonDecode
+import 'dart:io' show Platform; // To read environment variables
 import 'dart:math'; // For random preimage
 import 'dart:typed_data'; // For Uint8List
-import 'dart:convert'; // For jsonDecode
+
+import 'package:crypto/crypto.dart'; // For SHA256
 import 'package:http/http.dart' as http; // For LNURL HTTP requests
-// Import LND generated types
-import '../generated/lnd/lightning.pb.dart'; // Contains Invoice and Invoice_InvoiceState
-// Contains Payment and Payment_PaymentStatus
-import 'dart:async'; // For StreamSubscription, Timer
-import 'package:process_run/process_run.dart';
 import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
-import 'dart:io' show Platform; // To read environment variables
+import 'package:process_run/process_run.dart';
+
+import '../models/offer.dart';
+import 'database_service.dart';
+import 'lnd_service.dart';
+import 'nwc_service.dart';
+import 'payment_service.dart';
+import '../models/invoice_status.dart';
+import '../models/invoice_update.dart';
 
 // Set to Duration.zero for production
 const Duration _kDebugDelayDuration = Duration(seconds: 0);
 
 class CoordinatorService {
   final DatabaseService _dbService;
-  final LndService _lndService;
+  PaymentService? _paymentBackend; // Unified payment backend
+  String _paymentBackendType =
+      "none"; // To track active backend: "lnd", "nwc", or "none"
+
   matrix.Client? _matrixClient; // Matrix client instance
 
   final String _matrixHomeserver =
@@ -51,39 +56,31 @@ class CoordinatorService {
     if (plnRate == null || btcRate == null) {
       throw Exception('PLN or BTC rate missing in CoinGecko response');
     }
-    // PLN per BTC = pln.value / btc.value (btc.value should be 1)
     _cachedPlnRate = plnRate / btcRate;
     _cachedPlnRateTime = now;
     return _cachedPlnRate!;
   }
 
-  // WARNING: In-memory storage is not persistent. Use Redis or DB for production.
   final Map<String, Map<String, dynamic>> _pendingOffers = {};
-  // Map to hold active subscriptions for cancellation
   final Map<String, StreamSubscription> _invoiceSubscriptions = {};
-  // Map to hold active reservation timers (20s) for cancellation
   final Map<String, Timer> _reservationTimers = {};
-  // Map to hold active BLIK confirmation timers (120s)
   final Map<String, Timer> _blikConfirmationTimers = {};
-  // Map to hold active funded offer expiration timers (10min)
   final Map<String, Timer> _fundedOfferTimers = {};
 
   final double kMakerFeePercentage = 0.5;
   final double kTakerFeePercentage = 0.5;
 
-  CoordinatorService(this._dbService, this._lndService);
+  CoordinatorService(this._dbService);
 
   Future<void> init() async {
-    // Initialize dependencies if needed (DB and LND connections are handled separately)
-    print('CoordinatorService initialized.');
-    await _initializeMatrixClient(); // Initialize Matrix client
+    await _initializePaymentBackend();
+    print('CoordinatorService initialized with $_paymentBackendType backend.');
+    await _initializeMatrixClient();
     await _checkExpiredFundedOffers();
     await _checkExpiredReservations();
-    await _checkExpiredBlikConfirmations(); // Add check for BLIK confirmation timeouts
-    // TODO: Implement logic to potentially resume listening for pending offers on startup
+    await _checkExpiredBlikConfirmations();
   }
 
-  // --- Matrix Client Initialization ---
   Future<void> _initializeMatrixClient() async {
     if (_matrixUser.isEmpty ||
         _matrixPassword.isEmpty ||
@@ -95,29 +92,76 @@ class CoordinatorService {
     try {
       print(
           'Initializing Matrix client for $_matrixUser on $_matrixHomeserver...');
-      _matrixClient = matrix.Client(
-        'BitBlikCoordinator',
-        // No homeserver specified here
-      );
+      _matrixClient = matrix.Client('BitBlikCoordinator');
       await _matrixClient!.init();
       final loginResponse = await _matrixClient!.login(
         matrix.LoginType.mLoginPassword,
         identifier: matrix.AuthenticationUserIdentifier(user: _matrixUser),
         password: _matrixPassword,
-        // No homeserver specified here either
       );
       print(
           'Matrix client logged in successfully as ${loginResponse.userId.localpart}');
     } catch (e) {
       print('Error initializing or logging in Matrix client: $e');
-      _matrixClient = null; // Ensure client is null on error
+      _matrixClient = null;
     }
   }
-  // --- End Matrix Client Initialization ---
 
-  // --- Startup Check for Expired Funded Offers ---
+  Future<void> _initializePaymentBackend() async {
+    final nwcUri = Platform.environment['NWC_URI'];
+    final lndHost = Platform.environment['LND_HOST'];
+
+    if (nwcUri != null && nwcUri.isNotEmpty) {
+      print('NWC_URI found. Initializing NwcService...');
+      try {
+        final nwcService = NwcService(nwcUri: nwcUri);
+        await nwcService.connect();
+        _paymentBackend = nwcService;
+        _paymentBackendType = "nwc";
+        print('NwcService initialized and connected successfully.');
+      } catch (e) {
+        print('Error initializing NwcService: $e');
+        _paymentBackend = null; // Ensure backend is null on error
+        _paymentBackendType = "none";
+        print('Falling back to LND check due to NWC initialization error.');
+        if (lndHost != null && lndHost.isNotEmpty) {
+          await _initializeLndService(lndHost);
+        } else {
+          print('CRITICAL: NWC failed and LND_HOST not configured.');
+        }
+      }
+    } else if (lndHost != null && lndHost.isNotEmpty) {
+      await _initializeLndService(lndHost);
+    } else {
+      print(
+          'CRITICAL: No payment backend configured (NWC_URI or LND_HOST not set). Hold invoice functionality will be disabled.');
+      _paymentBackendType = "none";
+    }
+  }
+
+  Future<void> _initializeLndService(String lndHost) async {
+    print(
+        'LND_HOST found ($lndHost). Initializing LndService (uses internal env vars for details)...');
+    try {
+      final lndService = LndService();
+      await lndService.connect();
+      _paymentBackend = lndService;
+      _paymentBackendType = "lnd";
+      print('LndService initialized and connected successfully.');
+    } catch (e) {
+      print('Error initializing LndService: $e');
+      _paymentBackend = null; // Ensure backend is null on error
+      _paymentBackendType = "none";
+    }
+  }
+
   Future<void> _checkExpiredFundedOffers() async {
     print('Checking for expired funded offers on startup...');
+    if (_paymentBackend == null) {
+      print(
+          "Skipping expired funded offers check: No payment backend configured.");
+      return;
+    }
     try {
       final fundedOffers =
           await _dbService.getOffersByStatus(OfferStatus.funded, limit: 1000);
@@ -132,13 +176,13 @@ class CoordinatorService {
           print(
               'Offer ${offer.id} funded expired (created at $createdAt, expired at $expiryTime). Cancelling.');
           try {
-            final paymentHashBytes = hexToBytes(offer.holdInvoicePaymentHash);
-            await _lndService.cancelInvoice(paymentHashBytes);
+            await _paymentBackend!
+                .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
             print(
-                'Hold invoice for offer ${offer.id} cancelled due to startup expiration check.');
+                'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to startup expiration check.');
           } catch (e) {
             print(
-                'Error cancelling hold invoice for expired offer ${offer.id}: $e');
+                'Error cancelling hold invoice for expired offer ${offer.id} using $_paymentBackendType: $e');
           }
           final dbSuccess =
               await _dbService.updateOfferStatus(offer.id, OfferStatus.expired);
@@ -158,18 +202,14 @@ class CoordinatorService {
       print('Error during expired funded offer check: $e');
     }
   }
-  // --- End Startup Check for Expired Funded Offers ---
 
-  // --- Startup Check for Expired Reservations ---
   Future<void> _checkExpiredReservations() async {
     print('Checking for expired reserved offers on startup...');
     try {
-      final reservedOffers = await _dbService.getOffersByStatus(
-          OfferStatus.reserved,
-          limit: 1000); // Get all reserved offers
+      final reservedOffers =
+          await _dbService.getOffersByStatus(OfferStatus.reserved, limit: 1000);
       final now = DateTime.now().toUtc();
-      const timeoutDuration =
-          Duration(seconds: 20); // Reservation timeout UPDATED to 20s
+      const timeoutDuration = Duration(seconds: 20);
 
       int revertedCount = 0;
       for (final offer in reservedOffers) {
@@ -208,12 +248,10 @@ class CoordinatorService {
     }
   }
 
-  // --- Startup Check for Expired BLIK Confirmations ---
   Future<void> _checkExpiredBlikConfirmations() async {
     print(
-        '### COORDINATOR: Running _checkExpiredBlikConfirmations on startup...'); // Added prominent log
+        '### COORDINATOR: Running _checkExpiredBlikConfirmations on startup...');
     try {
-      // Check offers in both blikReceived and blikSentToMaker states
       final offersToCheck = [
         ...await _dbService.getOffersByStatus(OfferStatus.blikReceived,
             limit: 1000),
@@ -222,12 +260,10 @@ class CoordinatorService {
       ];
 
       final now = DateTime.now().toUtc();
-      const timeoutDuration =
-          Duration(seconds: 120); // BLIK confirmation timeout
+      const timeoutDuration = Duration(seconds: 120);
 
       int revertedCount = 0;
       for (final offer in offersToCheck) {
-        // Use blikReceivedAt timestamp for timeout calculation
         if (offer.blikReceivedAt != null) {
           final expiryTime = offer.blikReceivedAt!.add(timeoutDuration);
           if (now.isAfter(expiryTime)) {
@@ -235,7 +271,7 @@ class CoordinatorService {
                 'Offer ${offer.id} BLIK confirmation expired (BLIK received at ${offer.blikReceivedAt}, expired at $expiryTime). Reverting status.');
             final success = await _dbService.updateOfferStatus(
               offer.id,
-              OfferStatus.funded, // Revert to funded
+              OfferStatus.funded,
             );
             if (success) {
               revertedCount++;
@@ -245,7 +281,6 @@ class CoordinatorService {
             }
           }
         } else {
-          // This indicates an inconsistent state if status is blikReceived/blikSentToMaker
           print(
               'Warning: Offer ${offer.id} is in state ${offer.status} but has no blik_received_at timestamp. Reverting.');
           final success =
@@ -265,7 +300,6 @@ class CoordinatorService {
     }
   }
 
-  // --- Offer Creation Logic ---
   Future<Map<String, dynamic>> initiateOfferFiat({
     required double fiatAmount,
     required String makerId,
@@ -277,85 +311,120 @@ class CoordinatorService {
     final btcPerPln = 1 / rate;
     final btcAmount = fiatAmount * btcPerPln;
     final satsAmount = (btcAmount * 100000000).round();
-    final makerFees =
-        (satsAmount * kMakerFeePercentage / 100).ceil(); // Renamed
-    final totalAmountSats = satsAmount + makerFees; // Renamed
+    final makerFees = (satsAmount * kMakerFeePercentage / 100).ceil();
+    final totalAmountSats = satsAmount + makerFees;
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
     final paymentHashHex = paymentHash
         .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
         .join('');
     final memo = 'BitBlik Offer: $fiatAmount $fiatCurrency for BLIK';
-    final lndResponse =
-        await _lndService.createHoldInvoice(totalAmountSats, memo, paymentHash);
-    final holdInvoice = lndResponse.paymentRequest;
+
+    String holdInvoice;
+    String returnedPaymentHashHex = paymentHashHex;
+
+    if (_paymentBackend == null) {
+      print('CRITICAL: No payment backend configured for initiateOfferFiat.');
+      throw Exception("No payment backend configured to create hold invoice.");
+    }
+
+    final backendResponse = await _paymentBackend!.createHoldInvoice(
+        amountSats: totalAmountSats,
+        memo: memo,
+        paymentHashHex: paymentHashHex);
+    holdInvoice = backendResponse.invoice;
+    if (backendResponse.paymentHash != null &&
+        backendResponse.paymentHash!.isNotEmpty) {
+      returnedPaymentHashHex = backendResponse.paymentHash!;
+    }
+
     final preimageHex =
         preimage.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join('');
-    _pendingOffers[paymentHashHex] = {
+    _pendingOffers[returnedPaymentHashHex] = {
       'amountSats': satsAmount,
-      'makerFees': makerFees, // Renamed
+      'makerFees': makerFees,
       'makerId': makerId,
       'preimageHex': preimageHex,
       'fiatAmount': fiatAmount,
       'fiatCurrency': fiatCurrency,
+      'actualPaymentHashForSubscription': returnedPaymentHashHex,
     };
-    print('Pending offer stored for payment hash $paymentHashHex');
-    _startInvoiceSubscription(paymentHash, paymentHashHex);
+    print('Pending offer stored for payment hash $returnedPaymentHashHex');
+    _startInvoiceSubscription(returnedPaymentHashHex);
     return {
       'holdInvoice': holdInvoice,
-      'paymentHash': paymentHashHex,
+      'paymentHash': returnedPaymentHashHex,
       'fiatAmount': fiatAmount,
       'fiatCurrency': fiatCurrency,
       'amountSats': satsAmount,
-      'makerFees': makerFees, // Renamed
+      'makerFees': makerFees,
       'totalAmountSats': totalAmountSats,
       'rate': rate,
     };
   }
 
-  void _startInvoiceSubscription(List<int> paymentHash, String paymentHashHex) {
+  void _startInvoiceSubscription(String paymentHashHex) {
     _invoiceSubscriptions[paymentHashHex]?.cancel();
     print('Starting subscription for invoice: $paymentHashHex');
+
+    if (_paymentBackend == null) {
+      print(
+          'CRITICAL: No payment backend configured for _startInvoiceSubscription.');
+      _pendingOffers.remove(paymentHashHex);
+      return;
+    }
+
     try {
-      final subscription = _lndService.subscribeToInvoice(paymentHash).listen(
-        (Invoice invoiceUpdate) async {
+      final subscription = _paymentBackend!
+          .subscribeToInvoiceUpdates(paymentHashHex: paymentHashHex)
+          .listen(
+        (InvoiceUpdate update) async {
           print(
-              'Received update for ${paymentHashHex}: State=${invoiceUpdate.state}');
-          if (invoiceUpdate.state == Invoice_InvoiceState.ACCEPTED) {
-            print('Invoice ACCEPTED (funded): $paymentHashHex');
+              '$_paymentBackendType Invoice Update for $paymentHashHex: Status=${update.status}');
+          if (update.status == InvoiceStatus.ACCEPTED) {
+            print(
+                '$_paymentBackendType Invoice ACCEPTED (funded): $paymentHashHex');
             await _createOfferFromFundedInvoice(paymentHashHex);
             _invoiceSubscriptions[paymentHashHex]?.cancel();
             _invoiceSubscriptions.remove(paymentHashHex);
-            print(
-                'Subscription cancelled for accepted invoice: $paymentHashHex');
-          } else if (invoiceUpdate.state == Invoice_InvoiceState.CANCELED) {
-            print('Invoice CANCELED: $paymentHashHex');
+          } else if (update.status == InvoiceStatus.CANCELED) {
+            print('$_paymentBackendType Invoice CANCELED: $paymentHashHex');
             _pendingOffers.remove(paymentHashHex);
             _invoiceSubscriptions[paymentHashHex]?.cancel();
             _invoiceSubscriptions.remove(paymentHashHex);
-            print(
-                'Subscription cancelled for canceled invoice: $paymentHashHex');
-          } else if (invoiceUpdate.state == Invoice_InvoiceState.SETTLED) {
-            print('Invoice SETTLED (likely by us): $paymentHashHex');
+          } else if (update.status == InvoiceStatus.SETTLED) {
+            // This case might be less common for hold invoices before BLIK,
+            // but good to handle if the backend sends it.
+            print('$_paymentBackendType Invoice SETTLED: $paymentHashHex');
             _invoiceSubscriptions[paymentHashHex]?.cancel();
             _invoiceSubscriptions.remove(paymentHashHex);
           }
         },
         onError: (error) {
-          print('Error in subscription stream for $paymentHashHex: $error');
+          print(
+              'Error in $_paymentBackendType subscription stream for $paymentHashHex: $error');
           _pendingOffers.remove(paymentHashHex);
           _invoiceSubscriptions.remove(paymentHashHex);
         },
         onDone: () {
-          print('Subscription stream closed for $paymentHashHex');
-          _pendingOffers.remove(paymentHashHex);
-          _invoiceSubscriptions.remove(paymentHashHex);
+          print(
+              '$_paymentBackendType Subscription stream closed for $paymentHashHex');
+          // For NWC, onDone might not mean the end of the world if it's a shared stream.
+          // However, for a specific invoice subscription, it usually means it's over.
+          // LND typically closes after final state.
+          // To be safe, if it's not already removed by ACCEPTED/CANCELED/ERROR, remove it.
+          if (_invoiceSubscriptions.containsKey(paymentHashHex)) {
+            _pendingOffers.remove(
+                paymentHashHex); // Clean up pending offer if stream closes unexpectedly
+            _invoiceSubscriptions.remove(paymentHashHex);
+          }
         },
         cancelOnError: true,
       );
       _invoiceSubscriptions[paymentHashHex] = subscription;
     } catch (e) {
-      print('Failed to initiate subscription for $paymentHashHex: $e');
+      print(
+          'Failed to initiate $_paymentBackendType subscription for $paymentHashHex: $e');
       _pendingOffers.remove(paymentHashHex);
     }
   }
@@ -380,7 +449,7 @@ class CoordinatorService {
     try {
       final offer = Offer(
         amountSats: pendingData['amountSats'],
-        makerFees: pendingData['makerFees'], // Renamed
+        makerFees: pendingData['makerFees'],
         makerPubkey: pendingData['makerId'],
         holdInvoicePaymentHash: paymentHashHex,
         holdInvoicePreimage: pendingData['preimageHex'],
@@ -389,9 +458,7 @@ class CoordinatorService {
         fiatCurrency: pendingData['fiatCurrency'],
       );
       await _dbService.createOffer(offer);
-      // Start funded offer expiration timer (10min)
       _startFundedOfferTimer(offer.id, offer.holdInvoicePaymentHash);
-      // Execute simplex notification with sats and fiat info
       final fiatText =
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final notificationText =
@@ -402,16 +469,13 @@ class CoordinatorService {
         print('simplex command error: ${result.first.stderr}');
       }
 
-      // Send Matrix notification
       if (_matrixClient != null && _matrixClient!.isLogged()) {
         try {
           print('Sending Matrix notification to room $_matrixRoomId');
-          // Get the Room object first
           final room = _matrixClient!.getRoomById(_matrixRoomId);
           if (room == null) {
             print('Error: Could not find Matrix room $_matrixRoomId');
           } else {
-            // Send the event using the Room object's sendTextEvent method
             await room.sendTextEvent(notificationText);
             print('Matrix notification sent successfully.');
           }
@@ -429,7 +493,6 @@ class CoordinatorService {
     }
   }
 
-  // --- Funded Offer Expiration Timer Logic ---
   void _startFundedOfferTimer(String offerId, String paymentHash) {
     _fundedOfferTimers[offerId]?.cancel();
     print('Starting 10min funded offer expiration timer for offer $offerId');
@@ -445,12 +508,18 @@ class CoordinatorService {
     print('Handling funded offer expiration for offer $offerId');
     final offer = await _dbService.getOfferById(offerId);
     if (offer != null && offer.status == OfferStatus.funded) {
-      try {
-        final paymentHashBytes = hexToBytes(paymentHash);
-        await _lndService.cancelInvoice(paymentHashBytes);
-        print('Hold invoice for offer $offerId cancelled due to expiration.');
-      } catch (e) {
-        print('Error cancelling hold invoice for expired offer $offerId: $e');
+      if (_paymentBackend != null) {
+        try {
+          await _paymentBackend!.cancelInvoice(paymentHashHex: paymentHash);
+          print(
+              'Hold invoice for offer $offerId cancelled via $_paymentBackendType due to expiration.');
+        } catch (e) {
+          print(
+              'Error cancelling hold invoice for expired offer $offerId using $_paymentBackendType: $e');
+        }
+      } else {
+        print(
+            'CRITICAL: No payment backend to cancel invoice for expired offer $offerId.');
       }
       final dbSuccess =
           await _dbService.updateOfferStatus(offerId, OfferStatus.expired);
@@ -466,42 +535,33 @@ class CoordinatorService {
           'Offer $offerId is no longer funded (current status: ${offer?.status}). No action needed for funded expiration.');
     }
   }
-  // --- End Funded Offer Expiration Timer Logic ---
 
-  // --- Other API Endpoint Logic ---
-
-  // Updated to return funded and reserved offers with status and reserved_at
   Future<List<Map<String, dynamic>>> listAvailableOffers() async {
     print(
         'Listing available (funded, reserved, blikReceived) offers from DB...');
     final fundedOffers = await _dbService.getOffersByStatus(OfferStatus.funded);
     final reservedOffers =
         await _dbService.getOffersByStatus(OfferStatus.reserved);
-    final blikReceivedOffers = await _dbService
-        .getOffersByStatus(OfferStatus.blikReceived); // Fetch blikReceived
-    // Combine all relevant statuses
+    final blikReceivedOffers =
+        await _dbService.getOffersByStatus(OfferStatus.blikReceived);
     final allOffers = [
       ...fundedOffers,
       ...reservedOffers,
       ...blikReceivedOffers
     ];
 
-    // No need to filter by time here, client will handle countdown display
     final offerList = allOffers.map((offer) {
       return {
         'id': offer.id,
         'amount_sats': offer.amountSats,
-        'maker_fees': offer.makerFees, // Renamed
+        'maker_fees': offer.makerFees,
         'fiat_amount': offer.fiatAmount,
         'fiat_currency': offer.fiatCurrency,
-        'status': offer.status.name, // Return actual status
+        'status': offer.status.name,
         'created_at': offer.createdAt.toIso8601String(),
-        'reserved_at':
-            offer.reservedAt?.toIso8601String(), // Include reserved_at
-        'blik_received_at':
-            offer.blikReceivedAt?.toIso8601String(), // Include blik_received_at
-        'taker_fees': offer.takerFees, // Renamed
-        // hold_invoice_payment_hash is intentionally omitted from this list endpoint
+        'reserved_at': offer.reservedAt?.toIso8601String(),
+        'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
+        'taker_fees': offer.takerFees,
       };
     }).toList();
     return offerList;
@@ -512,65 +572,57 @@ class CoordinatorService {
     return await _dbService.getMyActiveOffers(userPubkey);
   }
 
-  // Method to fetch a single offer by payment hash
   Future<Offer?> getOfferByPaymentHash(String paymentHash) async {
     print('Fetching offer by payment hash: $paymentHash');
     return await _dbService.getOfferByPaymentHash(paymentHash);
   }
 
-  // Method to fetch a single offer by ID (delegates to dbService)
   Future<Offer?> getOfferById(String offerId) async {
     print('Fetching offer by ID: $offerId');
     return await _dbService.getOfferById(offerId);
   }
 
-  // Returns the reservation timestamp on success, null on failure
   Future<DateTime?> reserveOffer(String offerId, String takerId) async {
     print('Reserving offer $offerId for taker $takerId');
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
-        (offer.status != OfferStatus.funded && offer.status != OfferStatus.invalidBlik) ||
-        (offer.status == OfferStatus.invalidBlik && offer.takerPubkey != takerId)) {
+        (offer.status != OfferStatus.funded &&
+            offer.status != OfferStatus.invalidBlik) ||
+        (offer.status == OfferStatus.invalidBlik &&
+            offer.takerPubkey != takerId)) {
       print('Offer $offerId not found or not available for reservation.');
-      _fundedOfferTimers[offerId]
-          ?.cancel(); // Clean up funded timer if transitioning out
+      _fundedOfferTimers[offerId]?.cancel();
       _fundedOfferTimers.remove(offerId);
-      return null; // Return null on failure
+      return null;
     }
 
     final now = DateTime.now().toUtc();
-    final timestampToStore =
-        now.add(const Duration(seconds: 1)); // Add 1 second
+    final timestampToStore = now.add(const Duration(seconds: 1));
 
     final success = await _dbService.updateOfferStatus(
       offerId,
       OfferStatus.reserved,
       takerPubkey: takerId,
-      reservedAt: timestampToStore, // Pass the adjusted timestamp
+      reservedAt: timestampToStore,
     );
 
     if (success) {
       print(
           'Offer $offerId reserved successfully, DB timestamp set to $timestampToStore.');
-      _fundedOfferTimers[offerId]
-          ?.cancel(); // Clean up funded timer if transitioning out
+      _fundedOfferTimers[offerId]?.cancel();
       _fundedOfferTimers.remove(offerId);
       _startReservationTimer(offerId);
-      return timestampToStore; // Return the adjusted timestamp on success
+      return timestampToStore;
     } else {
       print('Failed to reserve offer $offerId in DB.');
-      return null; // Return null on failure
+      return null;
     }
   }
 
-  // --- Reservation Timer Logic ---
-
   void _startReservationTimer(String offerId) {
     _reservationTimers[offerId]?.cancel();
-    print(
-        'Starting 20s reservation timer for offer $offerId'); // UPDATED log text
+    print('Starting 20s reservation timer for offer $offerId');
     _reservationTimers[offerId] = Timer(const Duration(seconds: 20), () {
-      // UPDATED duration
       print('Reservation timer expired for offer $offerId');
       _handleReservationTimeout(offerId);
       _reservationTimers.remove(offerId);
@@ -600,17 +652,13 @@ class CoordinatorService {
     }
   }
 
-  // --- End Reservation Timer Logic ---
-
-  // --- BLIK Confirmation Timer Logic ---
-
   void _startBlikConfirmationTimer(String offerId) {
     _blikConfirmationTimers[offerId]?.cancel();
     print(
-        '### COORDINATOR: Starting 120s BLIK confirmation timer for offer $offerId'); // Added prominent log
+        '### COORDINATOR: Starting 120s BLIK confirmation timer for offer $offerId');
     _blikConfirmationTimers[offerId] = Timer(const Duration(seconds: 120), () {
       print(
-          '### COORDINATOR: Raw timer expired for offer $offerId. Calling handler...'); // Added prominent log
+          '### COORDINATOR: Raw timer expired for offer $offerId. Calling handler...');
       _handleBlikConfirmationTimeout(offerId);
       _blikConfirmationTimers.remove(offerId);
     });
@@ -618,7 +666,7 @@ class CoordinatorService {
 
   Future<void> _handleBlikConfirmationTimeout(String offerId) async {
     print(
-        '### COORDINATOR: Handling BLIK confirmation timeout for offer $offerId'); // Added prominent log
+        '### COORDINATOR: Handling BLIK confirmation timeout for offer $offerId');
     final offer = await _dbService.getOfferById(offerId);
     if (offer != null && (offer.status == OfferStatus.blikReceived)) {
       print(
@@ -640,8 +688,6 @@ class CoordinatorService {
     }
   }
 
-  // --- End BLIK Confirmation Timer Logic ---
-
   Future<bool> submitBlikCode(String offerId, String takerId, String blikCode,
       String takerLightningAddress) async {
     print('Submitting BLIK $blikCode for offer $offerId by taker $takerId');
@@ -653,13 +699,11 @@ class CoordinatorService {
       return false;
     }
 
-    // Calculate net amount after taker fees
-    final takerFees = (offer.amountSats * 0.005).ceil(); // Renamed
-    final netAmountSats = offer.amountSats - takerFees; // Renamed
+    final takerFees = (offer.amountSats * 0.005).ceil();
+    final netAmountSats = offer.amountSats - takerFees;
     print(
-        'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)'); // Renamed
+        'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
 
-    // Resolve LNURL with the net amount
     final takerInvoice =
         await _resolveLnurlPay(takerLightningAddress, netAmountSats);
     if (takerInvoice == null || takerInvoice.isEmpty) {
@@ -667,24 +711,24 @@ class CoordinatorService {
           'Could not get an invoice for net amount $netAmountSats sats for LN address $takerLightningAddress');
       return false;
     }
-    print('Offer $offerId not found, not reserved, or taker mismatch.');
+    // The following line seems to be a copy-paste error, the condition is already checked above.
+    // print('Offer $offerId not found, not reserved, or taker mismatch.');
 
     _reservationTimers[offerId]?.cancel();
     _reservationTimers.remove(offerId);
     print(
         'Cancelled reservation timer for offer $offerId due to BLIK submission.');
 
-    // Pass the current time for blikReceivedAt
     final blikReceivedTime = DateTime.now().toUtc();
     final success = await _dbService.updateOfferStatus(
         offerId, OfferStatus.blikReceived,
         blikCode: blikCode,
         takerLightningAddress: takerLightningAddress,
-        blikReceivedAt: blikReceivedTime); // Pass timestamp here
+        blikReceivedAt: blikReceivedTime);
 
     if (success) {
       print('BLIK code for offer $offerId stored.');
-      _startBlikConfirmationTimer(offerId); // Start the 120s timer
+      _startBlikConfirmationTimer(offerId);
     } else {
       print('Failed to store BLIK code for offer $offerId in DB.');
     }
@@ -694,48 +738,54 @@ class CoordinatorService {
   Future<String?> getBlikCodeForMaker(String offerId, String makerId) async {
     print('Maker $makerId requesting BLIK for offer $offerId');
     final offer = await _dbService.getOfferById(offerId);
-    // Allow fetching if status is blikReceived OR blikSentToMaker
     if (offer == null ||
         offer.makerPubkey != makerId ||
         offer.blikCode == null) {
       print(
-          'Offer $offerId not found, maker mismatch, status not blikReceived, or no BLIK code available.');
+          'Offer $offerId not found, maker mismatch, status not blikReceived/blikSentToMaker, or no BLIK code available.');
+      return null;
+    }
+    // Allow fetching if status is blikReceived OR blikSentToMaker
+    if (offer.status != OfferStatus.blikReceived &&
+        offer.status != OfferStatus.blikSentToMaker) {
+      print(
+          'Offer $offerId not in correct state (${offer.status}) to provide BLIK code to maker.');
       return null;
     }
 
     try {
-      // Update status without passing timestamps, as they are set automatically by DB or not needed
-      final statusUpdated = await _dbService.updateOfferStatus(
-          offerId, OfferStatus.blikSentToMaker);
-      if (!statusUpdated) {
-        print(
-            'Warning: Failed to update offer $offerId status to blikSentToMaker, but returning code anyway.');
-      } else {
-        print('Offer $offerId status updated to blikSentToMaker.');
+      // Only update to blikSentToMaker if it's currently blikReceived
+      if (offer.status == OfferStatus.blikReceived) {
+        final statusUpdated = await _dbService.updateOfferStatus(
+            offerId, OfferStatus.blikSentToMaker);
+        if (!statusUpdated) {
+          print(
+              'Warning: Failed to update offer $offerId status to blikSentToMaker, but returning code anyway.');
+        } else {
+          print('Offer $offerId status updated to blikSentToMaker.');
+        }
       }
+      // Cancel timer regardless, as maker is now involved.
       _blikConfirmationTimers[offerId]?.cancel();
       _blikConfirmationTimers.remove(offerId);
     } catch (e) {
-      print('Error updating offer $offerId status to blikSentToMaker: $e');
+      print('Error during getBlikCodeForMaker for offer $offerId: $e');
     }
 
     print('Returning BLIK code for offer $offerId to maker.');
     return offer.blikCode;
   }
 
-  // Method for Maker to mark BLIK as invalid
   Future<bool> markBlikInvalid(String offerId, String makerId) async {
     print('Maker $makerId marking BLIK as invalid for offer $offerId');
     final offer = await _dbService.getOfferById(offerId);
 
-    // 1. Check if offer exists and maker matches
     if (offer == null || offer.makerPubkey != makerId) {
       print(
           'Offer $offerId not found or maker ID mismatch for marking BLIK invalid.');
       return false;
     }
 
-    // 2. Check if offer is in a valid state to be marked invalid
     if (offer.status != OfferStatus.blikReceived &&
         offer.status != OfferStatus.blikSentToMaker) {
       print(
@@ -743,56 +793,45 @@ class CoordinatorService {
       return false;
     }
 
-    // 3. Cancel the BLIK confirmation timer if active
     _blikConfirmationTimers[offerId]?.cancel();
     _blikConfirmationTimers.remove(offerId);
     print('Cancelled BLIK confirmation timer for offer $offerId (if active).');
 
-    // 4. Update the offer status in the database
     final success =
         await _dbService.updateOfferStatus(offerId, OfferStatus.invalidBlik);
 
     if (success) {
       print('Offer $offerId status updated to invalidBlik.');
-      // TODO: Potentially notify the Taker that the BLIK was marked invalid.
     } else {
       print('Failed to update offer $offerId status to invalidBlik in DB.');
     }
-
     return success;
   }
 
-  // Method for Taker to mark offer as conflict after Maker marked BLIK invalid
   Future<bool> markOfferConflict(String offerId, String takerId) async {
     print('Taker $takerId marking offer $offerId as conflict.');
     final offer = await _dbService.getOfferById(offerId);
 
-    // 1. Check if offer exists and taker matches
     if (offer == null || offer.takerPubkey != takerId) {
       print(
           'Offer $offerId not found or taker ID mismatch for marking conflict.');
       return false;
     }
 
-    // 2. Check if offer is in the 'invalidBlik' state
     if (offer.status != OfferStatus.invalidBlik) {
       print(
           'Offer $offerId is not in the invalidBlik state (current state: ${offer.status}). Cannot mark as conflict.');
       return false;
     }
 
-    // 3. Update the offer status in the database
     final success =
         await _dbService.updateOfferStatus(offerId, OfferStatus.conflict);
 
     if (success) {
       print('Offer $offerId status updated to conflict.');
-      // TODO: Implement conflict resolution logic/notification.
-      // Maybe notify the Maker and/or an admin.
     } else {
       print('Failed to update offer $offerId status to conflict in DB.');
     }
-
     return success;
   }
 
@@ -801,10 +840,12 @@ class CoordinatorService {
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
         offer.makerPubkey != makerId ||
-        (offer.status != OfferStatus.conflict &&
+        (offer.status !=
+                OfferStatus
+                    .conflict && // Allow confirmation from conflict state
             offer.status != OfferStatus.blikSentToMaker)) {
       print(
-          'Offer $offerId not found, maker mismatch, or not in correct state for confirmation.');
+          'Offer $offerId not found, maker mismatch, or not in correct state for confirmation (current: ${offer?.status}).');
       return false;
     }
 
@@ -823,10 +864,17 @@ class CoordinatorService {
     print('Offer $offerId status updated to makerConfirmed.');
 
     try {
-      final preimageBytes = hexToBytes(offer.holdInvoicePreimage);
-      await _lndService.settleInvoice(preimageBytes);
-      print('Hold invoice for offer $offerId settled successfully.');
-      await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
+      if (_paymentBackend != null) {
+        await _paymentBackend!
+            .settleInvoice(preimageHex: offer.holdInvoicePreimage);
+        print(
+            'Hold invoice for offer $offerId settled successfully via $_paymentBackendType.');
+      } else {
+        print(
+            'CRITICAL: No payment backend to settle invoice for offer $offerId.');
+        throw Exception("No payment backend to settle invoice.");
+      }
+      await Future.delayed(_kDebugDelayDuration);
       success =
           await _dbService.updateOfferStatus(offerId, OfferStatus.settled);
       if (!success) {
@@ -834,6 +882,7 @@ class CoordinatorService {
       }
     } catch (e) {
       print('Error settling hold invoice for offer $offerId: $e');
+      // Potentially revert makerConfirmed status or set to a failed state
       return false;
     }
 
@@ -841,7 +890,6 @@ class CoordinatorService {
     return true;
   }
 
-  // --- Update Taker Invoice ---
   Future<bool> updateTakerInvoice(
       String offerId, String takerInvoice, String userPubkey) async {
     print('Updating taker invoice for offer $offerId by user $userPubkey');
@@ -863,7 +911,6 @@ class CoordinatorService {
     return success;
   }
 
-  // --- Offer Cancellation ---
   Future<bool> cancelOffer(String offerId, String makerId) async {
     print('Maker $makerId attempting to cancel offer $offerId');
     final offer = await _dbService.getOfferById(offerId);
@@ -873,41 +920,39 @@ class CoordinatorService {
     }
     if (offer.makerPubkey != makerId) {
       print('Maker mismatch for cancelling offer $offerId.');
-      return false; // Or throw AuthorizationError
+      return false;
     }
     if (offer.status != OfferStatus.funded) {
       print('Offer $offerId cannot be cancelled in status ${offer.status}.');
-      _fundedOfferTimers[offerId]
-          ?.cancel(); // Clean up funded timer if transitioning out
+      _fundedOfferTimers[offerId]?.cancel();
       _fundedOfferTimers.remove(offerId);
-      return false; // Can only cancel if funded
+      return false;
     }
 
-    _fundedOfferTimers[offerId]
-        ?.cancel(); // Clean up funded timer if transitioning out
+    _fundedOfferTimers[offerId]?.cancel();
     _fundedOfferTimers.remove(offerId);
 
-    // Attempt to cancel the hold invoice on LND first
-    try {
-      final paymentHashBytes = hexToBytes(offer.holdInvoicePaymentHash);
-      await _lndService.cancelInvoice(paymentHashBytes);
-      print('Hold invoice for offer $offerId cancelled successfully on LND.');
-    } catch (e) {
-      print('Error cancelling hold invoice for offer $offerId on LND: $e');
-      // Decide if we should still proceed to cancel in DB.
-      // If LND cancel fails, the invoice might still be payable.
-      // For now, let's proceed to cancel in DB anyway, but log the LND error.
-      // Consider adding a 'cancelFailedLnd' status?
+    if (_paymentBackend != null) {
+      try {
+        await _paymentBackend!
+            .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
+        print(
+            'Hold invoice for offer $offerId cancelled successfully via $_paymentBackendType.');
+      } catch (e) {
+        print(
+            'Error cancelling hold invoice for offer $offerId using $_paymentBackendType: $e');
+      }
+    } else {
+      print(
+          'CRITICAL: No payment backend to cancel invoice for offer $offerId.');
     }
 
-    // Update DB status to cancelled
     final dbSuccess = await _dbService.cancelOffer(offerId, makerId);
     if (dbSuccess) {
       print('Offer $offerId status updated to cancelled in DB.');
-      // Clean up any related resources (like invoice subscriptions)
       _invoiceSubscriptions[offer.holdInvoicePaymentHash]?.cancel();
       _invoiceSubscriptions.remove(offer.holdInvoicePaymentHash);
-      _pendingOffers.remove(offer.holdInvoicePaymentHash); // Just in case
+      _pendingOffers.remove(offer.holdInvoicePaymentHash);
       return true;
     } else {
       print('Failed to update offer $offerId status to cancelled in DB.');
@@ -915,7 +960,6 @@ class CoordinatorService {
     }
   }
 
-  // --- Asynchronous Taker Payment Task ---
   Future<void> _payTakerAsync(String offerId) async {
     print('Starting async taker payment process for offer $offerId...');
     final offer = await _dbService.getOfferById(offerId);
@@ -936,14 +980,12 @@ class CoordinatorService {
       return;
     }
 
-    // Calculate net amount after taker fees
-    final takerFees = (offer.amountSats * 0.005).ceil(); // Renamed
-    final netAmountSats = offer.amountSats - takerFees; // Renamed
+    final takerFees = (offer.amountSats * kTakerFeePercentage / 100).ceil();
+    final netAmountSats = offer.amountSats - takerFees;
     print(
-        'Async: Attempting to pay taker via LNURL: ${offer.takerLightningAddress} for net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)'); // Renamed
+        'Async: Attempting to pay taker via LNURL: ${offer.takerLightningAddress} for net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
 
     try {
-      // Resolve LNURL with the net amount
       final takerInvoice =
           await _resolveLnurlPay(offer.takerLightningAddress!, netAmountSats);
       if (takerInvoice == null) {
@@ -969,7 +1011,6 @@ class CoordinatorService {
     }
   }
 
-  // --- Refactored taker payment logic ---
   Future<String?> _sendTakerPayment(String offerId, String takerInvoice) async {
     print('Attempting to send taker payment for offer $offerId...');
     try {
@@ -980,62 +1021,58 @@ class CoordinatorService {
             offerId, OfferStatus.takerPaymentFailed);
         return "invalid offer";
       }
-      await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
+      await Future.delayed(_kDebugDelayDuration);
       await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
-      // Calculate taker fees (0.5% of the original offer amount)
-      final takerFees =
-          (offer.amountSats * kTakerFeePercentage / 100).ceil(); // Renamed
-      final netAmountSats = offer.amountSats - takerFees; // Renamed
+      final takerFees = (offer.amountSats * kTakerFeePercentage / 100).ceil();
+      final netAmountSats = offer.amountSats - takerFees;
       print(
-          'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.'); // Renamed
+          'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.');
 
-      // Pay the NET amount
-      final paymentStream = _lndService.sendPayment(
-        takerInvoice,
-        expectedAmountSat: netAmountSats, // Pay the NET amount
-        feeLimitSat: offer.makerFees + 100, // Renamed
-      );
-      bool paymentSucceeded = false;
-      await for (final paymentUpdate in paymentStream) {
-        if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
-          print('Successfully paid taker for offer $offerId.');
-          await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
-          // Update status and store the calculated taker fees
-          await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
-              takerFees: takerFees); // Renamed parameter
-          // Update taker invoice fees (routing fees paid by coordinator)
-          await _dbService.updateTakerInvoiceFees(
-              offerId, paymentUpdate.feeSat.toInt());
-          print(
-              'Updated taker invoice fees to ${paymentUpdate.feeSat} sats for offer $offerId.');
-          paymentSucceeded = true;
-          return null;
-        } else if (paymentUpdate.status == Payment_PaymentStatus.FAILED) {
-          print(
-              'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}');
-          await _dbService.updateOfferStatus(
-              offerId, OfferStatus.takerPaymentFailed);
-          return 'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}';
-        }
-      }
-      if (!paymentSucceeded) {
-        print(
-            'Taker payment stream completed without definitive status for offer $offerId.');
+      if (_paymentBackend == null) {
+        print('CRITICAL: No payment backend configured for _sendTakerPayment.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
-        return 'Taker payment stream completed without definitive status for offer $offerId.';
+        return 'No payment backend configured.';
       }
-      return null;
+
+      final feeLimitSat = offer.makerFees + 100;
+      print(
+          '$_paymentBackendType: Attempting to pay invoice for offer $offerId. Amount: $netAmountSats sats, Fee limit: $feeLimitSat sats.');
+
+      final paymentResult = await _paymentBackend!.payInvoice(
+        invoice: takerInvoice,
+        amountSat: netAmountSats,
+        feeLimitSat: feeLimitSat,
+      );
+
+      if (paymentResult.isSuccess) {
+        print(
+            '$_paymentBackendType: Successfully paid taker for offer $offerId. Preimage: ${paymentResult.paymentPreimage}');
+        await Future.delayed(_kDebugDelayDuration);
+        await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
+            takerFees: takerFees);
+        await _dbService.updateTakerInvoiceFees(
+            offerId, paymentResult.feeSat ?? 0);
+        print(
+            '$_paymentBackendType: Updated taker invoice fees to ${paymentResult.feeSat ?? 0} sats for offer $offerId.');
+        return null; // Success
+      } else {
+        print(
+            '$_paymentBackendType: Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}');
+        await _dbService.updateOfferStatus(
+            offerId, OfferStatus.takerPaymentFailed);
+        return '$_paymentBackendType: Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}';
+      }
     } catch (e) {
-      print('Exception during taker payment for offer $offerId: $e');
+      print(
+          'Exception during taker payment for offer $offerId (using $_paymentBackendType): $e');
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
       return 'Exception during taker payment for offer $offerId: $e';
     }
   }
 
-  // --- Retry taker payment with stored invoice ---
   Future<String?> retryTakerPayment(String offerId, String userPubkey) async {
     print('Retrying taker payment for offer $offerId by user $userPubkey');
     final offer = await _dbService.getOfferById(offerId);
@@ -1054,7 +1091,6 @@ class CoordinatorService {
     return await _sendTakerPayment(offerId, offer.takerInvoice!);
   }
 
-  // --- Helper Methods ---
   Uint8List _generatePreimage() {
     final random = Random.secure();
     return Uint8List.fromList(
@@ -1074,8 +1110,6 @@ class CoordinatorService {
     return Uint8List.fromList(bytes);
   }
 
-  // --- LNURL Pay Resolution Helper ---
-  // Takes the NET amount the taker should receive
   Future<String?> _resolveLnurlPay(
       String lightningAddress, int netAmountSats) async {
     try {
@@ -1113,7 +1147,6 @@ class CoordinatorService {
             'LNURL Error: Missing required fields (callback, min/maxSendable) in step 1 for $lightningAddress');
         return null;
       }
-      // Use net amount for LNURL request
       final amountMsats = netAmountSats * 1000;
       if (amountMsats < minSendable || amountMsats > maxSendable) {
         print(

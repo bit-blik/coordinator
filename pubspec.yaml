@@ -20,6 +20,11 @@ dependencies:
   shelf_cors_headers: ^0.1.5 # For adding CORS headers
   process_run: ^1.2.4 # For running shell commands
   matrix: ^0.39.1
+  ndk:
+    git:
+      url: https://github.com/relaystr/ndk.git
+      ref: nwc-hold-invoices
+      path: packages/ndk
   #flutter_olm: ^2.0.0
   #flutter_openssl_crypto: ^0.5.0
   # path: ^1.8.0

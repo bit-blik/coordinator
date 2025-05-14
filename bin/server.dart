@@ -23,12 +23,8 @@ Future<void> main(List<String> args) async {
     // Connect to Database
     await dbService.connect();
 
-    // Connect to LND
-    await lndService.connect();
-
-    // Initialize Coordinator Service (depends on DB and LND)
-    coordinatorService = CoordinatorService(dbService, lndService);
-    await coordinatorService.init(); // Perform any internal setup
+    coordinatorService = CoordinatorService(dbService);
+    await coordinatorService.init();
 
     // Initialize API Service (depends on Coordinator)
     apiService = ApiService(coordinatorService);
