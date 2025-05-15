@@ -86,13 +86,14 @@ class DatabaseService {
     final now = DateTime.now().toUtc();
     await _connection!.execute(
       '''
-        INSERT INTO offers (id, amount_sats, maker_fees, maker_pubkey, hold_invoice_payment_hash, hold_invoice_preimage, status, created_at, updated_at, fiat_amount, fiat_currency)
-        VALUES (@id, @amount_sats, @maker_fees, @maker_pubkey, @hold_invoice_payment_hash, @hold_invoice_preimage, @status, @created_at, @updated_at, @fiat_amount, @fiat_currency)
+        INSERT INTO offers (id, amount_sats, maker_fees, taker_fees, maker_pubkey, hold_invoice_payment_hash, hold_invoice_preimage, status, created_at, updated_at, fiat_amount, fiat_currency)
+        VALUES (@id, @amount_sats, @maker_fees, @taker_fees, @maker_pubkey, @hold_invoice_payment_hash, @hold_invoice_preimage, @status, @created_at, @updated_at, @fiat_amount, @fiat_currency)
       ''',
       substitutionValues: {
         'id': offer.id,
         'amount_sats': offer.amountSats,
-        'maker_fees': offer.makerFees, // Renamed
+        'maker_fees': offer.makerFees,
+        'taker_fees': offer.takerFees,
         'maker_pubkey': offer.makerPubkey,
         'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
         'hold_invoice_preimage': offer.holdInvoicePreimage,

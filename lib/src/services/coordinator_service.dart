@@ -345,6 +345,8 @@ class CoordinatorService {
     final satsAmount = (btcAmount * 100000000).round();
     final makerFees =
         (satsAmount * _makerFeePercentage / 100).ceil(); // Use static field
+    final takerFees =
+      (satsAmount * _takerFeePercentage / 100).ceil(); // Use static field
     final totalAmountSats = satsAmount + makerFees;
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
@@ -376,6 +378,7 @@ class CoordinatorService {
     _pendingOffers[returnedPaymentHashHex] = {
       'amountSats': satsAmount,
       'makerFees': makerFees,
+      'takerFees': takerFees,
       'makerId': makerId,
       'preimageHex': preimageHex,
       'fiatAmount': fiatAmount,
@@ -483,6 +486,7 @@ class CoordinatorService {
       final offer = Offer(
         amountSats: pendingData['amountSats'],
         makerFees: pendingData['makerFees'],
+        takerFees: pendingData['takerFees'],
         makerPubkey: pendingData['makerId'],
         holdInvoicePaymentHash: paymentHashHex,
         holdInvoicePreimage: pendingData['preimageHex'],
@@ -607,8 +611,8 @@ class CoordinatorService {
 
   // Updated to return funded and reserved offers with status and reserved_at
   Future<List<Map<String, dynamic>>> listAvailableOffers() async {
-    print(
-        'Listing available (funded, reserved, blikReceived) offers from DB...');
+    // print(
+    //     'Listing available (funded, reserved, blikReceived) offers from DB...');
     final fundedOffers = await _dbService.getOffersByStatus(OfferStatus.funded);
     final reservedOffers =
         await _dbService.getOffersByStatus(OfferStatus.reserved);
@@ -638,17 +642,17 @@ class CoordinatorService {
   }
 
   Future<List<Offer>> getMyActiveOffers(String userPubkey) async {
-    print('Fetching active offers for user: $userPubkey');
+    // print('Fetching active offers for user: $userPubkey');
     return await _dbService.getMyActiveOffers(userPubkey);
   }
 
   Future<Offer?> getOfferByPaymentHash(String paymentHash) async {
-    print('Fetching offer by payment hash: $paymentHash');
+    // print('Fetching offer by payment hash: $paymentHash');
     return await _dbService.getOfferByPaymentHash(paymentHash);
   }
 
   Future<Offer?> getOfferById(String offerId) async {
-    print('Fetching offer by ID: $offerId');
+    // print('Fetching offer by ID: $offerId');
     return await _dbService.getOfferById(offerId);
   }
 
@@ -771,12 +775,9 @@ class CoordinatorService {
       return false;
     }
 
-    // Calculate net amount after taker fees
-    final takerFees = (offer.amountSats * _takerFeePercentage / 100)
-        .ceil(); // Use static field
-    final netAmountSats = offer.amountSats - takerFees;
+    final netAmountSats = offer.amountSats - (offer.takerFees ?? (offer.amountSats * _takerFeePercentage / 100).ceil()) ;
     print(
-        'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
+        'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: ${offer.takerFees})');
 
     final takerInvoice =
         await _resolveLnurlPay(takerLightningAddress, netAmountSats);

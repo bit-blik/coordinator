@@ -429,8 +429,8 @@ packages:
     dependency: "direct main"
     description:
       path: "packages/ndk"
-      ref: nwc-hold-invoices
-      resolved-ref: d14eb79591eaa2abe004149f5b7494c6a15c0440
+      ref: bad4e0f98a8e07f256e5157dddc49163ff7c1ea9
+      resolved-ref: bad4e0f98a8e07f256e5157dddc49163ff7c1ea9
       url: "https://github.com/relaystr/ndk.git"
     source: git
     version: "0.3.2"
