@@ -120,7 +120,7 @@ class ApiService {
         return Response.badRequest(
             body: jsonEncode({
           'error':
-              'Missing required fields: fiat_amount, fee_percentage, maker_id'
+              'Missing required fields: fiat_amount, maker_id'
         }));
       }
       final result = await _coordinatorService.initiateOfferFiat(
