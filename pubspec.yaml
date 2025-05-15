@@ -24,7 +24,7 @@ dependencies:
   ndk:
     git:
       url: https://github.com/relaystr/ndk.git
-      ref: bad4e0f98a8e07f256e5157dddc49163ff7c1ea9
+      ref: c1b63db1b4b20c543b932876556408e78ab18a40
       path: packages/ndk
   #flutter_olm: ^2.0.0
   #flutter_openssl_crypto: ^0.5.0

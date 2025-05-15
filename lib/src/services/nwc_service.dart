@@ -1,21 +1,19 @@
 import 'dart:async';
-import 'dart:convert'; // For jsonEncode/Decode if used, though NDK handles it
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:convert/convert.dart'; // Added for hex
 import 'package:crypto/crypto.dart'; // For sha256 if used directly
-
+import 'package:ndk/domain_layer/usecases/nwc/nwc_notification.dart';
 // NDK imports
 import 'package:ndk/ndk.dart';
-import 'package:ndk/domain_layer/usecases/nwc/nwc_notification.dart';
-import 'package:ndk/domain_layer/usecases/nwc/responses/nwc_response.dart';
-// Import the interface
-import 'payment_service.dart';
+
+import '../models/create_hold_invoice_result.dart';
 import '../models/invoice_status.dart';
 import '../models/invoice_update.dart';
-import '../models/create_hold_invoice_result.dart';
 import '../models/pay_invoice_result.dart';
+// Import the interface
+import 'payment_service.dart';
 
 /// Service to interact with Nostr Wallet Connect (NWC) for hold invoices.
 class NwcService implements PaymentService {
