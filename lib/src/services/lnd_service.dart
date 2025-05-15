@@ -257,7 +257,7 @@ class LndService implements PaymentService {
       // sendPaymentV2 returns a stream. We need to listen until a terminal state.
       await for (final lndPaymentUpdate
           in _routerClient!.sendPaymentV2(request)) {
-        if (lndPaymentUpdate.status == lnd_router.PaymentState.SUCCEEDED) {
+        if (lndPaymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
           print(
               'LND: Payment SUCCEEDED. Preimage: ${lndPaymentUpdate.paymentPreimage}');
           return PayInvoiceResult(
@@ -265,25 +265,34 @@ class LndService implements PaymentService {
             feeSat: lndPaymentUpdate.feeSat.toInt(),
           );
         } else if (lndPaymentUpdate.status ==
-            lnd_router.PaymentState.FAILED_ERROR) {
+            Payment_PaymentStatus.FAILED) {
           print(
               'LND: Payment FAILED. Reason: ${lndPaymentUpdate.failureReason}');
           return PayInvoiceResult(
             paymentError: lndPaymentUpdate.failureReason.toString(),
           );
         } else if (lndPaymentUpdate.status ==
-            lnd_router.PaymentState.IN_FLIGHT) {
+            Payment_PaymentStatus.IN_FLIGHT) {
           print('LND: Payment IN_FLIGHT for hash: $paymentHashHex');
           // Continue listening
         }
         // Other states like UNKNOWN, INITIATED can be logged if needed
       }
       // If the stream completes without a terminal SUCCEEDED or FAILED_ERROR,
-      // it's an unexpected situation for sendPaymentV2.
+      // try to track the payment status using trackPaymentV2.
       print(
-          'LND: Payment stream completed without definitive SUCCEEDED/FAILED status for $paymentHashHex.');
+          'LND: Payment stream completed without definitive SUCCEEDED/FAILED status for $paymentHashHex. Attempting to track payment status...');
+      try {
+        final trackedResult = await _trackPaymentV2(paymentHashHex);
+        if (trackedResult != null) {
+          return trackedResult;
+        }
+      } catch (e) {
+        print('LND: Exception during trackPaymentV2 for $paymentHashHex: $e');
+      }
       return PayInvoiceResult(
-        paymentError: 'Payment stream completed without definitive status.',
+        paymentError:
+            'Payment stream completed without definitive status, and tracking did not resolve it.',
       );
     } catch (e) {
       print('LND: Exception during sendPaymentV2 for $paymentHashHex: $e');
@@ -293,5 +302,39 @@ class LndService implements PaymentService {
     }
   }
 
-  // sendPaymentStream method is now removed.
+  /// Helper to track payment status using LND's trackPaymentV2.
+  Future<PayInvoiceResult?> _trackPaymentV2(String paymentHashHex) async {
+    if (_routerClient == null) throw StateError('LND not connected.');
+    final paymentHashBytes = _hexToBytes(paymentHashHex);
+    final req = lnd_router.TrackPaymentRequest()
+      ..paymentHash = paymentHashBytes;
+    try {
+      await for (final update in _routerClient!.trackPaymentV2(req)) {
+        print(
+            '!!!!!!!!!!!!!!!!!!!!!!! LND: Payment status : ${update.status}');
+        if (update.status == Payment_PaymentStatus.SUCCEEDED) {
+          print(
+              'LND: trackPaymentV2: Payment SUCCEEDED. Preimage: ${update.paymentPreimage}');
+          return PayInvoiceResult(
+            paymentPreimage: update.paymentPreimage,
+            feeSat: update.feeSat.toInt(),
+          );
+        } else if (update.status == Payment_PaymentStatus.FAILED) {
+          print(
+              'LND: trackPaymentV2: Payment FAILED. Reason: ${update.failureReason}');
+          return PayInvoiceResult(
+            paymentError: update.failureReason.toString(),
+          );
+        } else if (update.status == Payment_PaymentStatus.IN_FLIGHT) {
+          print('LND: trackPaymentV2: Payment still IN_FLIGHT...');
+          // Continue listening
+        }
+      }
+      print('LND: trackPaymentV2: Stream ended without definitive status.');
+      return null;
+    } catch (e) {
+      print('LND: Exception in trackPaymentV2 for $paymentHashHex: $e');
+      return null;
+    }
+  }
 }
