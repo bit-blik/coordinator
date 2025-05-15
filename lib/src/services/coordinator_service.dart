@@ -1088,39 +1088,16 @@ class CoordinatorService {
 
       // Calculate taker fees (configurable % of the original offer amount)
       final takerFees = (offer.amountSats * _takerFeePercentage / 100)
-          .ceil(); // Use static field
+          .ceil();
       final netAmountSats = offer.amountSats - takerFees;
       print(
           'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.');
 
-      // Pay the NET amount
-      final paymentStream = _lndService.sendPayment(
-        takerInvoice,
-        expectedAmountSat: netAmountSats, // Pay the NET amount
-        feeLimitSat: offer.makerFees + 100,
-      );
-      bool paymentSucceeded = false;
-      await for (final paymentUpdate in paymentStream) {
-        if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
-          print('Successfully paid taker for offer $offerId.');
-          await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
-          // Update status and store the calculated taker fees
-          await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
-              takerFees: takerFees); // Renamed parameter
-          // Update taker invoice fees (routing fees paid by coordinator)
-          await _dbService.updateTakerInvoiceFees(
-              offerId, paymentUpdate.feeSat.toInt());
-          print(
-              'Updated taker invoice fees to ${paymentUpdate.feeSat} sats for offer $offerId.');
-          paymentSucceeded = true;
-          return null;
-        } else if (paymentUpdate.status == Payment_PaymentStatus.FAILED) {
-          print(
-              'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}');
-          await _dbService.updateOfferStatus(
-              offerId, OfferStatus.takerPaymentFailed);
-          return 'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}';
-        }
+      if (_paymentBackend == null) {
+        print('CRITICAL: No payment backend configured for _sendTakerPayment.');
+        await _dbService.updateOfferStatus(
+            offerId, OfferStatus.takerPaymentFailed);
+        return 'No payment backend configured.';
       }
 
       final feeLimitSat = offer.makerFees + 100;
