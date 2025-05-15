@@ -33,7 +33,7 @@ class CoordinatorService {
   static final String _coordinatorName =
       Platform.environment['NAME'] ?? 'BitBlik Coordinator';
   static final String _coordinatorIconUrl =
-      Platform.environment['ICON_URL'] ?? '';
+      Platform.environment['ICON_URL'] ?? 'https://bitblik.app/splash/img/dark-2x.png';
   static final String _coordinatorNostrNpub =
       Platform.environment['NOSTR_NPUB'] ?? '';
 
