@@ -4,6 +4,8 @@ import 'dart:io' show Platform; // To read environment variables
 import 'dart:math'; // For random preimage
 import 'dart:typed_data'; // For Uint8List
 
+import 'dart:io';
+import 'package:yaml/yaml.dart';
 import 'package:crypto/crypto.dart'; // For SHA256
 import 'package:http/http.dart' as http; // For LNURL HTTP requests
 import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
@@ -37,8 +39,8 @@ class CoordinatorService {
   // Coordinator Info
   static final String _coordinatorName =
       Platform.environment['NAME'] ?? 'BitBlik Coordinator';
-  static final String _coordinatorIconUrl =
-      Platform.environment['ICON_URL'] ?? 'https://bitblik.app/splash/img/dark-2x.png';
+  static final String _coordinatorIconUrl = Platform.environment['ICON_URL'] ??
+      'https://bitblik.app/splash/img/dark-2x.png';
   static final String _coordinatorNostrNpub =
       Platform.environment['NOSTR_NPUB'] ?? '';
 
@@ -586,6 +588,18 @@ class CoordinatorService {
       info['nostr_npub'] = _coordinatorNostrNpub;
     }
 
+    // Read version from pubspec.yaml
+    try {
+      final pubspecFile = File('pubspec.yaml');
+      if (await pubspecFile.exists()) {
+        final yamlContent = await pubspecFile.readAsString();
+        final yamlMap = loadYaml(yamlContent);
+        final version = yamlMap['version'];
+        if (version != null) {
+          info['version'] = version.toString();
+        }
+      }
+    } catch (_) {}
     return info;
   }
 
@@ -1087,8 +1101,7 @@ class CoordinatorService {
       await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
       // Calculate taker fees (configurable % of the original offer amount)
-      final takerFees = (offer.amountSats * _takerFeePercentage / 100)
-          .ceil();
+      final takerFees = (offer.amountSats * _takerFeePercentage / 100).ceil();
       final netAmountSats = offer.amountSats - takerFees;
       print(
           'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.');
