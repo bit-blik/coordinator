@@ -30,6 +30,22 @@ class ApiService {
         _markBlikInvalidHandler); // New BLIK invalid endpoint
     _router.post('/offers/<offerId>/conflict',
         _markOfferConflictHandler); // New conflict endpoint
+    _router.get(
+        '/info', _getCoordinatorInfoHandler); // New coordinator info endpoint
+  }
+
+  Future<Response> _getCoordinatorInfoHandler(Request request) async {
+    try {
+      final info = await _coordinatorService.getCoordinatorInfo();
+      return Response.ok(jsonEncode(info),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      print('Error in _getCoordinatorInfoHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode({
+        'error': 'Failed to retrieve coordinator info: ${e.toString()}'
+      }));
+    }
   }
 
   Future<Response> _retryTakerPaymentHandler(

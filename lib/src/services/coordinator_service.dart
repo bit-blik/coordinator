@@ -34,6 +34,31 @@ class CoordinatorService {
   final String _matrixPassword = Platform.environment['MATRIX_PASSWORD'] ?? '';
   final String _matrixRoomId = Platform.environment['MATRIX_ROOM'] ?? '';
 
+  // Coordinator Info
+  static final String _coordinatorName =
+      Platform.environment['NAME'] ?? 'BitBlik Coordinator';
+  static final String _coordinatorIconUrl =
+      Platform.environment['ICON_URL'] ?? 'https://bitblik.app/splash/img/dark-2x.png';
+  static final String _coordinatorNostrNpub =
+      Platform.environment['NOSTR_NPUB'] ?? '';
+
+  // Offer amount limits
+  static final int _minAmountSats =
+      int.tryParse(Platform.environment['MIN_AMOUNT_SATS'] ?? '') ?? 1000;
+  static final int _maxAmountSats =
+      int.tryParse(Platform.environment['MAX_AMOUNT_SATS'] ?? '') ?? 250000;
+
+  // Supported currencies
+  static final List<String> _supportedCurrencies =
+      (Platform.environment['CURRENCIES']?.split(',') ?? ['PLN'])
+          .map((c) => c.trim().toUpperCase())
+          .toList();
+
+  // Reservation timeout configuration
+  static final int _reservationTimeoutSeconds =
+      int.tryParse(Platform.environment['RESERVATION_SECONDS'] ?? '') ??
+          30; // Default to 30 seconds
+
   // CoinGecko rate cache
   double? _cachedPlnRate;
   DateTime? _cachedPlnRateTime;
@@ -67,8 +92,13 @@ class CoordinatorService {
   final Map<String, Timer> _blikConfirmationTimers = {};
   final Map<String, Timer> _fundedOfferTimers = {};
 
-  final double kMakerFeePercentage = 0.5;
-  final double kTakerFeePercentage = 0.5;
+  // Fee percentages, configurable via environment variables
+  static final double _makerFeePercentage =
+      double.tryParse(Platform.environment['MAKER_FEE'] ?? '') ??
+          0.5; // Default to 0.5%
+  static final double _takerFeePercentage =
+      double.tryParse(Platform.environment['TAKER_FEE'] ?? '') ??
+          0.5; // Default to 0.5%
 
   CoordinatorService(this._dbService);
 
@@ -208,7 +238,8 @@ class CoordinatorService {
       final reservedOffers =
           await _dbService.getOffersByStatus(OfferStatus.reserved, limit: 1000);
       final now = DateTime.now().toUtc();
-      const timeoutDuration = Duration(seconds: 20);
+      final timeoutDuration =
+          Duration(seconds: _reservationTimeoutSeconds); // Reservation timeout
 
       int revertedCount = 0;
       for (final offer in reservedOffers) {
@@ -310,7 +341,8 @@ class CoordinatorService {
     final btcPerPln = 1 / rate;
     final btcAmount = fiatAmount * btcPerPln;
     final satsAmount = (btcAmount * 100000000).round();
-    final makerFees = (satsAmount * kMakerFeePercentage / 100).ceil();
+    final makerFees =
+        (satsAmount * _makerFeePercentage / 100).ceil(); // Use static field
     final totalAmountSats = satsAmount + makerFees;
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
@@ -535,6 +567,31 @@ class CoordinatorService {
     }
   }
 
+  // --- Coordinator Info Endpoint ---
+  Future<Map<String, dynamic>> getCoordinatorInfo() async {
+    final Map<String, dynamic> info = {
+      'name': _coordinatorName,
+      'reservation_seconds': _reservationTimeoutSeconds,
+      'maker_fee': _makerFeePercentage,
+      'taker_fee': _takerFeePercentage,
+      'min_amount_sats': _minAmountSats,
+      'max_amount_sats': _maxAmountSats,
+      'currencies': _supportedCurrencies,
+    };
+
+    if (_coordinatorIconUrl.isNotEmpty) {
+      info['icon'] = _coordinatorIconUrl;
+    }
+    if (_coordinatorNostrNpub.isNotEmpty) {
+      info['nostr_npub'] = _coordinatorNostrNpub;
+    }
+
+    return info;
+  }
+
+  // --- Other API Endpoint Logic ---
+
+  // Updated to return funded and reserved offers with status and reserved_at
   Future<List<Map<String, dynamic>>> listAvailableOffers() async {
     print(
         'Listing available (funded, reserved, blikReceived) offers from DB...');
@@ -620,8 +677,10 @@ class CoordinatorService {
 
   void _startReservationTimer(String offerId) {
     _reservationTimers[offerId]?.cancel();
-    print('Starting 20s reservation timer for offer $offerId');
-    _reservationTimers[offerId] = Timer(const Duration(seconds: 20), () {
+    print(
+        'Starting $_reservationTimeoutSeconds\s reservation timer for offer $offerId');
+    _reservationTimers[offerId] =
+        Timer(Duration(seconds: _reservationTimeoutSeconds), () {
       print('Reservation timer expired for offer $offerId');
       _handleReservationTimeout(offerId);
       _reservationTimers.remove(offerId);
@@ -698,7 +757,9 @@ class CoordinatorService {
       return false;
     }
 
-    final takerFees = (offer.amountSats * 0.005).ceil();
+    // Calculate net amount after taker fees
+    final takerFees = (offer.amountSats * _takerFeePercentage / 100)
+        .ceil(); // Use static field
     final netAmountSats = offer.amountSats - takerFees;
     print(
         'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
@@ -979,7 +1040,9 @@ class CoordinatorService {
       return;
     }
 
-    final takerFees = (offer.amountSats * kTakerFeePercentage / 100).ceil();
+    // Calculate net amount after taker fees
+    final takerFees = (offer.amountSats * _takerFeePercentage / 100)
+        .ceil(); // Use static field
     final netAmountSats = offer.amountSats - takerFees;
     print(
         'Async: Attempting to pay taker via LNURL: ${offer.takerLightningAddress} for net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
@@ -1023,16 +1086,41 @@ class CoordinatorService {
       await Future.delayed(_kDebugDelayDuration);
       await _dbService.updateOfferStatus(offerId, OfferStatus.payingTaker);
 
-      final takerFees = (offer.amountSats * kTakerFeePercentage / 100).ceil();
+      // Calculate taker fees (configurable % of the original offer amount)
+      final takerFees = (offer.amountSats * _takerFeePercentage / 100)
+          .ceil(); // Use static field
       final netAmountSats = offer.amountSats - takerFees;
       print(
           'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.');
 
-      if (_paymentBackend == null) {
-        print('CRITICAL: No payment backend configured for _sendTakerPayment.');
-        await _dbService.updateOfferStatus(
-            offerId, OfferStatus.takerPaymentFailed);
-        return 'No payment backend configured.';
+      // Pay the NET amount
+      final paymentStream = _lndService.sendPayment(
+        takerInvoice,
+        expectedAmountSat: netAmountSats, // Pay the NET amount
+        feeLimitSat: offer.makerFees + 100,
+      );
+      bool paymentSucceeded = false;
+      await for (final paymentUpdate in paymentStream) {
+        if (paymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
+          print('Successfully paid taker for offer $offerId.');
+          await Future.delayed(_kDebugDelayDuration); // DEBUG DELAY
+          // Update status and store the calculated taker fees
+          await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
+              takerFees: takerFees); // Renamed parameter
+          // Update taker invoice fees (routing fees paid by coordinator)
+          await _dbService.updateTakerInvoiceFees(
+              offerId, paymentUpdate.feeSat.toInt());
+          print(
+              'Updated taker invoice fees to ${paymentUpdate.feeSat} sats for offer $offerId.');
+          paymentSucceeded = true;
+          return null;
+        } else if (paymentUpdate.status == Payment_PaymentStatus.FAILED) {
+          print(
+              'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}');
+          await _dbService.updateOfferStatus(
+              offerId, OfferStatus.takerPaymentFailed);
+          return 'Failed to pay taker for offer $offerId. Reason: ${paymentUpdate.failureReason}';
+        }
       }
 
       final feeLimitSat = offer.makerFees + 100;
