@@ -353,7 +353,7 @@ class CoordinatorService {
     final paymentHashHex = paymentHash
         .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
         .join('');
-    final memo = 'BitBlik Offer: $fiatAmount $fiatCurrency for BLIK';
+    final memo = '${_coordinatorName} - Payment $fiatAmount $fiatCurrency reference: $paymentHashHex. This payment WILL FREEZE IN YOUR WALLET, check on BitBlik if the lock was successful. It will be unlocked (fail) unless you cheat or cancel unilaterally.';
 
     String holdInvoice;
     String returnedPaymentHashHex = paymentHashHex;
