@@ -127,15 +127,14 @@ class CoordinatorService {
         if (lndHost != null && lndHost.isNotEmpty) {
           await _initializeLndService(lndHost);
         } else {
-          print('CRITICAL: NWC failed and LND_HOST not configured.');
+          throw Exception("CRITICAL: NWC failed and LND_HOST not configured");
         }
       }
     } else if (lndHost != null && lndHost.isNotEmpty) {
       await _initializeLndService(lndHost);
     } else {
-      print(
-          'CRITICAL: No payment backend configured (NWC_URI or LND_HOST not set). Hold invoice functionality will be disabled.');
-      _paymentBackendType = "none";
+      throw Exception(
+          "CRITICAL: No payment backend configured (NWC_URI or LND_HOST not set). Hold invoice functionality will be disabled.");
     }
   }
 

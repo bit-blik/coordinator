@@ -71,6 +71,12 @@ class NwcService implements PaymentService {
         throw Exception(
             'NWC Connection failed: _nwcConnection is null after connect call.');
       }
+      if (!_nwcConnection!.permissions.contains("make_hold_invoice") ||
+          !_nwcConnection!.permissions.contains("settle_hold_invoice") ||
+          !_nwcConnection!.permissions.contains("cancel_hold_invoice")) {
+        throw Exception(
+            'NWC Connection failed: make_hold_invoice, settle_hold_invoice & cancel_hold_invoice permission needed. Make sure to use a NWC wallet provider that supports these permissions like Alby Hub >= 1.18.0');
+      }
 
       print(
           'NWC Service: Connected successfully to wallet: ${_nwcConnection?.uri.walletPubkey}.');
