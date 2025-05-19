@@ -29,9 +29,6 @@ class NwcService implements PaymentService {
     _ndk = Ndk.emptyBootstrapRelaysConfig();
   }
 
-  // --- PaymentBackendInterface Implementation ---
-  @override
-  String get backendType => "nwc";
 
   @override
   Future<void> connect(
@@ -181,9 +178,7 @@ class NwcService implements PaymentService {
 
   @override
   Stream<InvoiceUpdate> subscribeToInvoiceUpdates(
-      // Return InvoiceUpdate
       {required String paymentHashHex}) {
-    // Named required parameter
     if (_nwcConnection == null) {
       // No .isConnected check
       // Or connect if not connected? For now, require prior connection.
@@ -193,14 +188,12 @@ class NwcService implements PaymentService {
     print('NWC Service: Subscribing to invoice updates for $paymentHashHex');
     // Filter the broadcast stream for the specific payment hash
     return _invoiceSubscriptionController.stream.where((data) =>
-        data.paymentHash ==
-        paymentHashHex); // Check against InvoiceUpdate.paymentHash
+        data.paymentHash == paymentHashHex);
   }
 
   @override
   Future<void> settleInvoice({required String preimageHex}) async {
     if (_nwcConnection == null) {
-      // No .isConnected check
       throw Exception('NWC Service: Not connected.');
     }
     print('NWC Service: Settling hold invoice with preimage: $preimageHex');
@@ -223,7 +216,6 @@ class NwcService implements PaymentService {
   @override
   Future<void> cancelInvoice({required String paymentHashHex}) async {
     if (_nwcConnection == null) {
-      // No .isConnected check
       throw Exception('NWC Service: Not connected.');
     }
     print(
