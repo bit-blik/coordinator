@@ -1271,13 +1271,15 @@ class CoordinatorService {
 
   Future<Map<String, dynamic>> getSuccessfulOffersWithStats() async {
     print('Fetching successful offers with stats...');
-    final successfulOffers = await _dbService.getOffersByStatus(
+    final allSuccessfulOffers = await _dbService.getOffersByStatus(
         OfferStatus.takerPaid,
-        limit: 10000); // Fetch a large number for stats
+        limit: 10000); // Fetch a large number for stats for calculations
 
-    final List<Map<String, dynamic>> offersJson = [];
-    Duration totalBlikReceivedToCreatedDuration = Duration.zero;
-    int countBlikReceivedToCreated = 0;
+    final List<Map<String, dynamic>> offersJsonLast7Days =
+        []; // For the response's "offers" field
+    Duration totalBlikReceivedToCreatedDuration =
+        Duration.zero; // For stats calculation
+    int countBlikReceivedToCreated = 0; // For stats calculation
     Duration totalTakerPaidToCreatedDuration = Duration.zero;
     int countTakerPaidToCreated = 0;
 
@@ -1289,9 +1291,14 @@ class CoordinatorService {
     final sevenDaysAgo =
         DateTime.now().toUtc().subtract(const Duration(days: 7));
 
-    for (final offer in successfulOffers) {
-      offersJson.add(offer.toJson()); // Assuming Offer model has toJson
+    // Iterate over all successful offers for stats calculation
+    for (final offer in allSuccessfulOffers) {
+      // Add to offersJsonLast7Days only if created in the last 7 days
+      if (offer.createdAt.isAfter(sevenDaysAgo)) {
+        offersJsonLast7Days.add(offer.toJson());
+      }
 
+      // Calculate stats based on allSuccessfulOffers
       if (offer.blikReceivedAt != null) {
         final duration = offer.blikReceivedAt!.difference(offer.createdAt);
         totalBlikReceivedToCreatedDuration += duration;
@@ -1336,24 +1343,24 @@ class CoordinatorService {
         : 0;
 
     return {
-      'offers': offersJson,
+      'offers': offersJsonLast7Days, // Return only offers from the last 7 days
       'stats': {
         'lifetime': {
           'avg_time_blik_received_to_created_seconds':
               avgBlikReceivedToCreatedLifetime,
           'avg_time_taker_paid_to_created_seconds':
               avgTakerPaidToCreatedLifetime,
-          'count': successfulOffers.length,
+          'count': allSuccessfulOffers.length, // Count based on all offers
         },
         'last_7_days': {
           'avg_time_blik_received_to_created_seconds':
               avgBlikReceivedToCreatedLast7Days,
           'avg_time_taker_paid_to_created_seconds':
               avgTakerPaidToCreatedLast7Days,
-          'count': offersJson
-              .where(
-                  (o) => DateTime.parse(o['created_at']).isAfter(sevenDaysAgo))
-              .length,
+          'count':
+              allSuccessfulOffers // Count for last_7_days stats based on filtering all offers
+                  .where((o) => o.createdAt.isAfter(sevenDaysAgo))
+                  .length,
         }
       }
     };
