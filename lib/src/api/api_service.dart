@@ -32,6 +32,8 @@ class ApiService {
         _markOfferConflictHandler); // New conflict endpoint
     _router.get(
         '/info', _getCoordinatorInfoHandler); // New coordinator info endpoint
+    _router.get('/stats/successful-offers',
+        _getSuccessfulOffersStatsHandler); // New stats endpoint
   }
 
   Future<Response> _getCoordinatorInfoHandler(Request request) async {
@@ -118,10 +120,8 @@ class ApiService {
 
       if (fiatAmount == null || makerId == null) {
         return Response.badRequest(
-            body: jsonEncode({
-          'error':
-              'Missing required fields: fiat_amount, maker_id'
-        }));
+            body: jsonEncode(
+                {'error': 'Missing required fields: fiat_amount, maker_id'}));
       }
       final result = await _coordinatorService.initiateOfferFiat(
         fiatAmount: fiatAmount,
@@ -522,6 +522,21 @@ class ApiService {
       return Response.internalServerError(
           body: jsonEncode(
               {'error': 'Failed to mark offer as conflict: ${e.toString()}'}));
+    }
+  }
+
+  Future<Response> _getSuccessfulOffersStatsHandler(Request request) async {
+    try {
+      // TODO: Implement authentication/authorization if needed for this endpoint
+      final stats = await _coordinatorService.getSuccessfulOffersWithStats();
+      return Response.ok(jsonEncode(stats),
+          headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      print('Error in _getSuccessfulOffersStatsHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode({
+        'error': 'Failed to retrieve successful offers stats: ${e.toString()}'
+      }));
     }
   }
 }

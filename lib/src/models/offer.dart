@@ -75,5 +75,12 @@ class Offer {
   })  : id = id ?? Uuid().v4(),
         createdAt = createdAt ?? DateTime.now().toUtc();
 
-  // Add methods for serialization/deserialization if needed
+  Map<String, dynamic> toJson() => {
+        'created_at': createdAt.toIso8601String(),
+        'reserved_at': reservedAt?.toIso8601String(),
+        'blik_received_at': blikReceivedAt?.toIso8601String(),
+        'settled_at': settledAt?.toIso8601String(),
+        'fiat_amount': fiatAmount,
+        'fiat_currency': fiatCurrency,
+      };
 }

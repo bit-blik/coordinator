@@ -127,6 +127,7 @@ class LndService implements PaymentService {
         _hexToBytes(paymentHashHex); // Use top-level helper
     final request = AddHoldInvoiceRequest()
       ..memo = memo
+      ..cltvExpiry = Int64(80)
       ..hash = paymentHashBytes
       ..value = Int64(amountSats)
       ..expiry = Int64(86400); // 24 hours expiration
@@ -150,6 +151,7 @@ class LndService implements PaymentService {
       InvoiceStatus status;
       switch (lndInvoice.state) {
         case Invoice_InvoiceState.ACCEPTED:
+          print("LND: lndInvoice ACCEPTED cltvExpiry=${lndInvoice.cltvExpiry} paidSats:${lndInvoice.amtPaidSat}");
           status = InvoiceStatus.ACCEPTED;
           break;
         case Invoice_InvoiceState.SETTLED:

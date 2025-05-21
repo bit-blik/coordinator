@@ -58,8 +58,11 @@ class CoordinatorService {
 
   // Reservation timeout configuration
   static final int _reservationTimeoutSeconds =
-      int.tryParse(Platform.environment['RESERVATION_SECONDS'] ?? '') ??
-          30; // Default to 30 seconds
+      int.tryParse(Platform.environment['RESERVATION_SECONDS'] ?? '') ?? 30;
+
+  // Funded expire timeout configuration
+  static final int _fundedExpireTimeoutSeconds =
+      int.tryParse(Platform.environment['FUNDED_EXPIRY_SECONDS'] ?? '') ?? 600;
 
   // CoinGecko rate cache
   double? _cachedPlnRate;
@@ -346,14 +349,15 @@ class CoordinatorService {
     final makerFees =
         (satsAmount * _makerFeePercentage / 100).ceil(); // Use static field
     final takerFees =
-      (satsAmount * _takerFeePercentage / 100).ceil(); // Use static field
+        (satsAmount * _takerFeePercentage / 100).ceil(); // Use static field
     final totalAmountSats = satsAmount + makerFees;
     final preimage = _generatePreimage();
     final paymentHash = sha256.convert(preimage).bytes;
     final paymentHashHex = paymentHash
         .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
         .join('');
-    final memo = '${_coordinatorName} - Payment $fiatAmount $fiatCurrency reference: $paymentHashHex. This payment WILL FREEZE IN YOUR WALLET, check on BitBlik if the lock was successful. It will be unlocked (fail) unless you cheat or cancel unilaterally.';
+    final memo =
+        '${_coordinatorName} - Payment $fiatAmount $fiatCurrency reference: $paymentHashHex. This payment WILL FREEZE IN YOUR WALLET, check on BitBlik if the lock was successful. It will be unlocked (fail) unless you cheat or cancel unilaterally.';
 
     String holdInvoice;
     String returnedPaymentHashHex = paymentHashHex;
@@ -495,7 +499,7 @@ class CoordinatorService {
         fiatCurrency: pendingData['fiatCurrency'],
       );
       await _dbService.createOffer(offer);
-      _startFundedOfferTimer(offer.id, offer.holdInvoicePaymentHash);
+      _startFundedOfferTimer(offer);
       final fiatText =
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final notificationText =
@@ -530,46 +534,47 @@ class CoordinatorService {
     }
   }
 
-  void _startFundedOfferTimer(String offerId, String paymentHash) {
-    _fundedOfferTimers[offerId]?.cancel();
-    print('Starting 10min funded offer expiration timer for offer $offerId');
-    _fundedOfferTimers[offerId] = Timer(const Duration(minutes: 10), () {
-      print('Funded offer expired for offer $offerId');
-      _handleFundedOfferExpiration(offerId, paymentHash);
-      _fundedOfferTimers.remove(offerId);
+  void _startFundedOfferTimer(Offer offer) {
+    _fundedOfferTimers[offer.id]?.cancel();
+    print('Starting 10min funded offer expiration timer for offer ${offer.id}');
+    _fundedOfferTimers[offer.id] =
+        Timer(Duration(seconds: _fundedExpireTimeoutSeconds), () {
+      print('Funded offer expired for offer ${offer.id}');
+      _handleFundedOfferExpiration(offer);
+      _fundedOfferTimers.remove(offer.id);
     });
   }
 
-  Future<void> _handleFundedOfferExpiration(
-      String offerId, String paymentHash) async {
-    print('Handling funded offer expiration for offer $offerId');
-    final offer = await _dbService.getOfferById(offerId);
-    if (offer != null && offer.status == OfferStatus.funded) {
+  Future<void> _handleFundedOfferExpiration(Offer offer) async {
+    print('Handling funded offer expiration for offer ${offer.id}');
+    if (offer.status == OfferStatus.funded) {
       if (_paymentBackend != null) {
         try {
-          await _paymentBackend!.cancelInvoice(paymentHashHex: paymentHash);
+          // await _paymentBackend!.cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
+          await _paymentBackend!
+              .settleInvoice(preimageHex: offer.holdInvoicePreimage);
           print(
-              'Hold invoice for offer $offerId cancelled via $_paymentBackendType due to expiration.');
+              'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to expiration.');
         } catch (e) {
           print(
-              'Error cancelling hold invoice for expired offer $offerId using $_paymentBackendType: $e');
+              'Error cancelling hold invoice for expired offer ${offer.id} using $_paymentBackendType: $e');
         }
       } else {
         print(
-            'CRITICAL: No payment backend to cancel invoice for expired offer $offerId.');
+            'CRITICAL: No payment backend to cancel invoice for expired offer ${offer.id}.');
       }
       final dbSuccess =
-          await _dbService.updateOfferStatus(offerId, OfferStatus.expired);
+          await _dbService.updateOfferStatus(offer.id, OfferStatus.expired);
       if (dbSuccess) {
         print(
-            'Offer $offerId status updated to expired in DB due to expiration.');
+            'Offer ${offer.id} status updated to expired in DB due to expiration.');
       } else {
         print(
-            'Failed to update offer $offerId status to expired in DB after expiration.');
+            'Failed to update offer ${offer.id} status to expired in DB after expiration.');
       }
     } else {
       print(
-          'Offer $offerId is no longer funded (current status: ${offer?.status}). No action needed for funded expiration.');
+          'Offer ${offer.id} is no longer funded (current status: ${offer.status}). No action needed for funded expiration.');
     }
   }
 
@@ -775,7 +780,9 @@ class CoordinatorService {
       return false;
     }
 
-    final netAmountSats = offer.amountSats - (offer.takerFees ?? (offer.amountSats * _takerFeePercentage / 100).ceil()) ;
+    final netAmountSats = offer.amountSats -
+        (offer.takerFees ??
+            (offer.amountSats * _takerFeePercentage / 100).ceil());
     print(
         'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: ${offer.takerFees})');
 
@@ -1260,5 +1267,95 @@ class CoordinatorService {
       print('Exception during LNURL resolution for $lightningAddress: $e');
       return null;
     }
+  }
+
+  Future<Map<String, dynamic>> getSuccessfulOffersWithStats() async {
+    print('Fetching successful offers with stats...');
+    final successfulOffers = await _dbService.getOffersByStatus(
+        OfferStatus.takerPaid,
+        limit: 10000); // Fetch a large number for stats
+
+    final List<Map<String, dynamic>> offersJson = [];
+    Duration totalBlikReceivedToCreatedDuration = Duration.zero;
+    int countBlikReceivedToCreated = 0;
+    Duration totalTakerPaidToCreatedDuration = Duration.zero;
+    int countTakerPaidToCreated = 0;
+
+    Duration last7DaysBlikReceivedToCreatedDuration = Duration.zero;
+    int last7DaysCountBlikReceivedToCreated = 0;
+    Duration last7DaysTakerPaidToCreatedDuration = Duration.zero;
+    int last7DaysCountTakerPaidToCreated = 0;
+
+    final sevenDaysAgo =
+        DateTime.now().toUtc().subtract(const Duration(days: 7));
+
+    for (final offer in successfulOffers) {
+      offersJson.add(offer.toJson()); // Assuming Offer model has toJson
+
+      if (offer.blikReceivedAt != null) {
+        final duration = offer.blikReceivedAt!.difference(offer.createdAt);
+        totalBlikReceivedToCreatedDuration += duration;
+        countBlikReceivedToCreated++;
+        if (offer.createdAt.isAfter(sevenDaysAgo)) {
+          last7DaysBlikReceivedToCreatedDuration += duration;
+          last7DaysCountBlikReceivedToCreated++;
+        }
+      }
+
+      if (offer.takerPaidAt != null) {
+        final duration = offer.takerPaidAt!.difference(offer.createdAt);
+        totalTakerPaidToCreatedDuration += duration;
+        countTakerPaidToCreated++;
+        if (offer.createdAt.isAfter(sevenDaysAgo)) {
+          last7DaysTakerPaidToCreatedDuration += duration;
+          last7DaysCountTakerPaidToCreated++;
+        }
+      }
+    }
+
+    final avgBlikReceivedToCreatedLifetime = countBlikReceivedToCreated > 0
+        ? (totalBlikReceivedToCreatedDuration.inSeconds /
+                countBlikReceivedToCreated)
+            .round()
+        : 0;
+    final avgTakerPaidToCreatedLifetime = countTakerPaidToCreated > 0
+        ? (totalTakerPaidToCreatedDuration.inSeconds / countTakerPaidToCreated)
+            .round()
+        : 0;
+
+    final avgBlikReceivedToCreatedLast7Days =
+        last7DaysCountBlikReceivedToCreated > 0
+            ? (last7DaysBlikReceivedToCreatedDuration.inSeconds /
+                    last7DaysCountBlikReceivedToCreated)
+                .round()
+            : 0;
+    final avgTakerPaidToCreatedLast7Days = last7DaysCountTakerPaidToCreated > 0
+        ? (last7DaysTakerPaidToCreatedDuration.inSeconds /
+                last7DaysCountTakerPaidToCreated)
+            .round()
+        : 0;
+
+    return {
+      'offers': offersJson,
+      'stats': {
+        'lifetime': {
+          'avg_time_blik_received_to_created_seconds':
+              avgBlikReceivedToCreatedLifetime,
+          'avg_time_taker_paid_to_created_seconds':
+              avgTakerPaidToCreatedLifetime,
+          'count': successfulOffers.length,
+        },
+        'last_7_days': {
+          'avg_time_blik_received_to_created_seconds':
+              avgBlikReceivedToCreatedLast7Days,
+          'avg_time_taker_paid_to_created_seconds':
+              avgTakerPaidToCreatedLast7Days,
+          'count': offersJson
+              .where(
+                  (o) => DateTime.parse(o['created_at']).isAfter(sevenDaysAgo))
+              .length,
+        }
+      }
+    };
   }
 }
