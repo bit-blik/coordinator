@@ -5,9 +5,9 @@ import '../models/offer.dart';
 // Load connection details from environment variables, defaulting to localhost and 5432
 final _dbHost = Platform.environment['DB_HOST'] ?? 'localhost';
 final _dbPort = int.tryParse(Platform.environment['DB_PORT'] ?? '') ?? 5432;
-final _dbName = 'bitblik_db';
-final _dbUser = 'user'; // Replace with your DB user
-final _dbPassword = 'password'; // Replace with your DB password
+final _dbName = Platform.environment['DB'] ?? 'bitblik';
+final _dbUser = Platform.environment['DB_USER'] ?? 'postgres'; // Replace with your DB user
+final _dbPassword = Platform.environment['DB_PASSWORD'] ?? '**********'; // Replace with your DB password
 
 class DatabaseService {
   PostgreSQLConnection? _connection;
