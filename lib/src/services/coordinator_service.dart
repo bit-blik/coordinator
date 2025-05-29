@@ -372,9 +372,8 @@ class CoordinatorService {
         memo: memo,
         paymentHashHex: paymentHashHex);
     holdInvoice = backendResponse.invoice;
-    if (backendResponse.paymentHash != null &&
-        backendResponse.paymentHash!.isNotEmpty) {
-      returnedPaymentHashHex = backendResponse.paymentHash!;
+    if (backendResponse.paymentHash.isNotEmpty) {
+      returnedPaymentHashHex = backendResponse.paymentHash;
     }
 
     final preimageHex =

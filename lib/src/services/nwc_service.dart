@@ -29,7 +29,6 @@ class NwcService implements PaymentService {
     _ndk = Ndk.emptyBootstrapRelaysConfig();
   }
 
-
   @override
   Future<void> connect(
       {bool doGetInfoMethod = true, Function(String?)? onError}) async {
@@ -167,8 +166,7 @@ class NwcService implements PaymentService {
           'NWC Service: Hold invoice created: ${response.invoice}, paymentHash: ${response.paymentHash}');
       return CreateHoldInvoiceResult(
         invoice: response.invoice,
-        paymentHash: response.paymentHash ??
-            paymentHashHex, // Prefer response hash if available
+        paymentHash: response.paymentHash, // Prefer response hash if available
       );
     } catch (e) {
       print('NWC Service: Error in createHoldInvoice: $e');
@@ -187,8 +185,8 @@ class NwcService implements PaymentService {
     }
     print('NWC Service: Subscribing to invoice updates for $paymentHashHex');
     // Filter the broadcast stream for the specific payment hash
-    return _invoiceSubscriptionController.stream.where((data) =>
-        data.paymentHash == paymentHashHex);
+    return _invoiceSubscriptionController.stream
+        .where((data) => data.paymentHash == paymentHashHex);
   }
 
   @override
