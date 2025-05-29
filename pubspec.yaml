@@ -11,7 +11,6 @@ dependencies:
   postgres: ^2.6.1 # Or latest version
   grpc: ^4.0.4 # Or latest version
   protobuf: ^4.0.0 # Or latest version
-  # dart_nostr: ^9.0.0 # Removed for HTTP MVP
   uuid: ^4.0.0 # Or latest version
   fixnum: ^1.1.0 # For Int64 support in protobuf
   shelf: ^1.4.0 # For HTTP server framework
@@ -24,7 +23,7 @@ dependencies:
   ndk:
     git:
       url: https://github.com/relaystr/ndk.git
-      ref: c1b63db1b4b20c543b932876556408e78ab18a40
+      ref: 5a89be2ba21dd066a94b1f83aeba7ee42e75ea6a
       path: packages/ndk
   #flutter_olm: ^2.0.0
   #flutter_openssl_crypto: ^0.5.0
