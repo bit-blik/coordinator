@@ -1,15 +1,17 @@
+- tests
+- settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 - transaction to dispute state
+- sign the api requests with priv key
+- fidelity bond for taker
+- refactor to use websockets / nostr
+- check leaking details on api json
+- telegram bot
+- multiple coordinators (from DVM/nostr announced?)
 - while in /taker-conflict if maker confirms it should refresh and show taker success
 
 - better details on MakerSuccessScreen
-- show details of invoice to pay (amount in sats + fees)
 - save the failed payment reason (could not get an invoice from lnurl/ no route /??) and show it on takerFailedPayment screen
 
-- settle maker invoice after 4 hours even if not confirmed so that we can resolve conflict having the sats
-- sign the api requests with priv key
-- coordinator info capabilities endpoint with min/max amounts, maker/taker fees for discovery
-
-- show coordinator/client version on UI
 - timer countdown of 2min for validity of blik code in both taker/maker screens with info what to do next.
 - in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
 - backup/restore keys
@@ -18,11 +20,8 @@
 - coordinator /admin/* for admin actions on allowed pubkeys
 
 ======
-- fidelity bond for taker
 - NWC wallet integration
-- WebLN for paying invoice with Alby extension
 - re-generate new keys
-- refactor to use websockets / nostr
 
 ======
 - tests
