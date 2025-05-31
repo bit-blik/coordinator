@@ -28,6 +28,8 @@ class ApiService {
         '/offers/<offerId>/cancel', _cancelOfferHandler); // New cancel endpoint
     _router.post('/offers/<offerId>/blik-invalid',
         _markBlikInvalidHandler); // New BLIK invalid endpoint
+    _router.delete('/offers/<offerId>/reservation',
+        _cancelReservationHandler); // Taker cancel reservation endpoint
     _router.post('/offers/<offerId>/conflict',
         _markOfferConflictHandler); // New conflict endpoint
     _router.get(
@@ -425,6 +427,37 @@ class ApiService {
       return Response.internalServerError(
           body: jsonEncode(
               {'error': 'Failed to get offer status: ${e.toString()}'}));
+    }
+  }
+
+  // Handler for taker cancelling a reservation
+  Future<Response> _cancelReservationHandler(
+      Request request, String offerId) async {
+    try {
+      final takerId = request.headers['x-user-pubkey'];
+      if (takerId == null || takerId.isEmpty) {
+        return Response.unauthorized(jsonEncode(
+            {'error': 'Missing user identification (x-user-pubkey header)'}));
+      }
+
+      final success =
+          await _coordinatorService.cancelReservation(offerId, takerId);
+
+      if (success) {
+        return Response.ok(
+            jsonEncode({'message': 'Reservation cancelled successfully'}));
+      } else {
+        return Response(409,
+            body: jsonEncode({
+              'error':
+                  'Failed to cancel reservation. It might be in the wrong state or you are not the taker.'
+            }));
+      }
+    } catch (e) {
+      print('Error in _cancelReservationHandler: $e');
+      return Response.internalServerError(
+          body: jsonEncode(
+              {'error': 'Failed to cancel reservation: ${e.toString()}'}));
     }
   }
 
