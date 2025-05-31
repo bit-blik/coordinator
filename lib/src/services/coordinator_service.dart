@@ -64,9 +64,72 @@ class CoordinatorService {
   static final int _fundedExpireTimeoutSeconds =
       int.tryParse(Platform.environment['FUNDED_EXPIRY_SECONDS'] ?? '') ?? 600;
 
-  // CoinGecko rate cache
+  // Exchange rate cache
   double? _cachedPlnRate;
   DateTime? _cachedPlnRateTime;
+
+  // Define a structure for exchange rate sources
+  static final List<Map<String, String>> _exchangeRateSources = [
+    {
+      'name': 'CoinGecko',
+      'url':
+          'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=pln',
+      'parser': '_parseCoinGeckoResponse',
+    },
+    {
+      'name': 'Yadio',
+      'url': 'https://api.yadio.io/exrates/pln',
+      'parser': '_parseYadioResponse',
+    },
+    {
+      'name': 'Blockchain.info',
+      'url': 'https://blockchain.info/ticker',
+      'parser': '_parseBlockchainInfoResponse',
+    }
+  ];
+
+  // Parser for CoinGecko response
+  double? _parseCoinGeckoResponse(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      final rate = data['bitcoin']['pln'];
+      if (rate is num) {
+        return rate.toDouble();
+      }
+    } catch (e) {
+      print('Error parsing CoinGecko response: $e');
+    }
+    return null;
+  }
+
+  // Parser for Yadio.io response
+  double? _parseYadioResponse(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      final rate =
+          data['BTC']; // Yadio returns BTC in PLN directly with this key
+      if (rate is num) {
+        return rate.toDouble();
+      }
+    } catch (e) {
+      print('Error parsing Yadio response: $e');
+    }
+    return null;
+  }
+
+  // Parser for Blockchain.info response
+  double? _parseBlockchainInfoResponse(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      final rate = data['PLN']?['last'];
+      if (rate is num) {
+        return rate.toDouble();
+      }
+    } catch (e) {
+      print('Error parsing Blockchain.info response: $e');
+    }
+    return null;
+  }
 
   Future<double> _getPlnRate() async {
     final now = DateTime.now();
@@ -75,20 +138,66 @@ class CoordinatorService {
         now.difference(_cachedPlnRateTime!).inMinutes < 5) {
       return _cachedPlnRate!;
     }
-    final url = Uri.parse('https://api.coingecko.com/api/v3/exchange_rates');
-    final response = await http.get(url);
-    if (response.statusCode != 200) {
-      throw Exception('Failed to fetch CoinGecko rates');
+
+    List<Future<double?>> fetchFutures = [];
+    for (var source in _exchangeRateSources) {
+      fetchFutures.add(_fetchRateFromSource(source));
     }
-    final data = jsonDecode(response.body);
-    final plnRate = data['rates']?['pln']?['value'];
-    final btcRate = data['rates']?['btc']?['value'];
-    if (plnRate == null || btcRate == null) {
-      throw Exception('PLN or BTC rate missing in CoinGecko response');
+
+    final List<double?> results = await Future.wait(fetchFutures);
+    final List<double> validRates =
+        results.where((rate) => rate != null).cast<double>().toList();
+
+    if (validRates.isNotEmpty) {
+      final averageRate =
+          validRates.reduce((a, b) => a + b) / validRates.length;
+      _cachedPlnRate = averageRate;
+      _cachedPlnRateTime = now;
+      print(
+          'Successfully fetched and averaged BTC/PLN rate: $averageRate from ${validRates.length} sources.');
+      return averageRate;
+    } else {
+      if (_cachedPlnRate != null) {
+        print(
+            'Returning stale BTC/PLN rate due to all sources failing to fetch.');
+        return _cachedPlnRate!;
+      }
+      throw Exception('Failed to fetch BTC/PLN rate from all sources.');
     }
-    _cachedPlnRate = plnRate / btcRate;
-    _cachedPlnRateTime = now;
-    return _cachedPlnRate!;
+  }
+
+  Future<double?> _fetchRateFromSource(Map<String, String> source) async {
+    final url = Uri.parse(source['url']!);
+    final parserName = source['parser']!;
+    final sourceName = source['name']!;
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        double? rate;
+        if (parserName == '_parseCoinGeckoResponse') {
+          rate = _parseCoinGeckoResponse(response.body);
+        } else if (parserName == '_parseYadioResponse') {
+          rate = _parseYadioResponse(response.body);
+        } else if (parserName == '_parseBlockchainInfoResponse') {
+          rate = _parseBlockchainInfoResponse(response.body);
+        }
+        if (rate != null) {
+          print('Successfully fetched rate from $sourceName: $rate');
+          return rate;
+        } else {
+          print('Failed to parse response from $sourceName');
+          return null;
+        }
+      } else {
+        print(
+            'Failed to fetch BTC/PLN rate from $sourceName: ${response.statusCode} ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('Error fetching BTC/PLN rate from $sourceName: $e');
+      return null;
+    }
   }
 
   final Map<String, Map<String, dynamic>> _pendingOffers = {};
@@ -709,23 +818,32 @@ class CoordinatorService {
     });
   }
 
+  // New private method to handle reverting an offer to funded state
+  Future<bool> _revertOfferToFunded(String offerId) async {
+    print('Reverting offer $offerId to funded state.');
+    final success = await _dbService.updateOfferStatus(
+      offerId,
+      OfferStatus.funded,
+      takerPubkey: null,
+      blikCode: null,
+      takerLightningAddress: null,
+      reservedAt: null, // Ensure reservedAt is cleared
+    );
+    if (success) {
+      print('Offer $offerId successfully reverted to funded.');
+    } else {
+      print('Error reverting offer $offerId to funded in DB.');
+    }
+    return success;
+  }
+
   Future<void> _handleReservationTimeout(String offerId) async {
     print('Handling reservation timeout for offer $offerId');
     final offer = await _dbService.getOfferById(offerId);
     if (offer != null && offer.status == OfferStatus.reserved) {
-      print('Offer $offerId is still reserved. Reverting status to funded.');
-      final success = await _dbService.updateOfferStatus(
-        offerId,
-        OfferStatus.funded,
-        takerPubkey: null,
-        blikCode: null,
-        takerLightningAddress: null,
-      );
-      if (success) {
-        print('Offer $offerId status reverted to funded due to timeout.');
-      } else {
-        print('Error reverting offer $offerId status after timeout.');
-      }
+      print(
+          'Offer $offerId is still reserved. Reverting status to funded due to timeout.');
+      await _revertOfferToFunded(offerId);
     } else {
       print(
           'Offer $offerId no longer reserved (current status: ${offer?.status}). No action needed for reservation timeout.');
@@ -990,6 +1108,40 @@ class CoordinatorService {
       print('Failed to update taker invoice for offer $offerId.');
     }
     return success;
+  }
+
+  Future<bool> cancelReservation(String offerId, String takerId) async {
+    print('Taker $takerId attempting to cancel reservation for offer $offerId');
+    final offer = await _dbService.getOfferById(offerId);
+    if (offer == null) {
+      print('Offer $offerId not found.');
+      return false;
+    }
+    if (offer.takerPubkey != takerId) {
+      print('Taker mismatch for cancelling reservation on offer $offerId.');
+      return false;
+    }
+    if (offer.status != OfferStatus.reserved) {
+      print('Offer $offerId cannot be cancelled in status ${offer.status}.');
+      _reservationTimers[offerId]?.cancel();
+      _reservationTimers.remove(offerId);
+      return false;
+    }
+
+    _reservationTimers[offerId]?.cancel();
+    _reservationTimers.remove(offerId);
+
+    // Revert offer to funded using the new method
+    final reverted = await _revertOfferToFunded(offerId);
+
+    if (reverted) {
+      print('Reservation for offer $offerId cancelled by taker.');
+      return true;
+    } else {
+      print(
+          'Failed to cancel reservation for offer $offerId (DB update failed).');
+      return false;
+    }
   }
 
   Future<bool> cancelOffer(String offerId, String makerId) async {
