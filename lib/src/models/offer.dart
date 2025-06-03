@@ -75,6 +75,58 @@ class Offer {
   })  : id = id ?? Uuid().v4(),
         createdAt = createdAt ?? DateTime.now().toUtc();
 
+  Offer copyWith({
+    String? id,
+    int? amountSats,
+    int? makerFees,
+    String? makerPubkey,
+    String? holdInvoicePaymentHash,
+    String? holdInvoicePreimage,
+    OfferStatus? status,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? takerPubkey,
+    DateTime? reservedAt,
+    String? blikCode,
+    DateTime? blikReceivedAt,
+    String? takerLightningAddress,
+    String? takerInvoice,
+    int? takerInvoiceFees,
+    DateTime? makerConfirmedAt,
+    DateTime? settledAt,
+    DateTime? takerPaidAt,
+    int? takerFees,
+    double? fiatAmount,
+    String? fiatCurrency,
+  }) {
+    return Offer(
+      id: id ?? this.id,
+      amountSats: amountSats ?? this.amountSats,
+      makerFees: makerFees ?? this.makerFees,
+      makerPubkey: makerPubkey ?? this.makerPubkey,
+      holdInvoicePaymentHash:
+          holdInvoicePaymentHash ?? this.holdInvoicePaymentHash,
+      holdInvoicePreimage: holdInvoicePreimage ?? this.holdInvoicePreimage,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      takerPubkey: takerPubkey ?? this.takerPubkey,
+      reservedAt: reservedAt ?? this.reservedAt,
+      blikCode: blikCode ?? this.blikCode,
+      blikReceivedAt: blikReceivedAt ?? this.blikReceivedAt,
+      takerLightningAddress:
+          takerLightningAddress ?? this.takerLightningAddress,
+      takerInvoice: takerInvoice ?? this.takerInvoice,
+      takerInvoiceFees: takerInvoiceFees ?? this.takerInvoiceFees,
+      makerConfirmedAt: makerConfirmedAt ?? this.makerConfirmedAt,
+      settledAt: settledAt ?? this.settledAt,
+      takerPaidAt: takerPaidAt ?? this.takerPaidAt,
+      takerFees: takerFees ?? this.takerFees,
+      fiatAmount: fiatAmount ?? this.fiatAmount,
+      fiatCurrency: fiatCurrency ?? this.fiatCurrency,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'created_at': createdAt.toIso8601String(),
         'reserved_at': reservedAt?.toIso8601String(),

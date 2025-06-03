@@ -6,6 +6,7 @@ import 'dart:typed_data'; // For Uint8List
 
 import 'dart:io';
 import 'package:yaml/yaml.dart';
+import 'package:clock/clock.dart'; // Added for Clock
 import 'package:crypto/crypto.dart'; // For SHA256
 import 'package:http/http.dart' as http; // For LNURL HTTP requests
 import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
@@ -27,6 +28,8 @@ class CoordinatorService {
   PaymentService? _paymentBackend; // Unified payment backend
   String _paymentBackendType =
       "none"; // To track active backend: "lnd", "nwc", or "none"
+  final Clock _clock; // Added for testable time
+  final http.Client _httpClient; // Added for testable HTTP calls
 
   matrix.Client? _matrixClient; // Matrix client instance
 
@@ -172,7 +175,7 @@ class CoordinatorService {
     final sourceName = source['name']!;
 
     try {
-      final response = await http.get(url);
+      final response = await _httpClient.get(url); // Use _httpClient
       if (response.statusCode == 200) {
         double? rate;
         if (parserName == '_parseCoinGeckoResponse') {
@@ -214,10 +217,31 @@ class CoordinatorService {
       double.tryParse(Platform.environment['TAKER_FEE'] ?? '') ??
           0.5; // Default to 0.5%
 
-  CoordinatorService(this._dbService);
+  CoordinatorService(this._dbService, {PaymentService? paymentServiceForTest, Clock? clock, http.Client? httpClient})
+      : _clock = clock ?? const Clock(),
+        _httpClient = httpClient ?? http.Client() { // Initialize _httpClient
+    if (paymentServiceForTest != null) {
+      _paymentBackend = paymentServiceForTest;
+      // Potentially set _paymentBackendType based on the type of paymentServiceForTest if needed
+      // For now, tests will mock the behavior, so type string might be less critical in test scope.
+      // We also need to determine _paymentBackendType if a mock is injected.
+      // For simplicity in tests, we might not rely on _paymentBackendType string if _paymentBackend is mocked.
+      // Or, we could require tests to also specify the type, or infer it.
+      // Let's assume for now that if paymentServiceForTest is provided, _paymentBackendType might remain "none"
+      // or be set to a generic "mock" or "test". The core logic relies on the _paymentBackend instance.
+      print('CoordinatorService initialized with injected payment backend for testing.');
+      // If a payment backend is injected, we assume it's already "connected" or its connect() is a no-op/mocked.
+      // We also might want to set _paymentBackendType.
+      // For now, let's set it to "injected_test_backend" to make it clear.
+      _paymentBackendType = "injected_test_backend";
+    }
+  }
 
   Future<void> init() async {
-    await _initializePaymentBackend();
+    if (_paymentBackend == null) { // Only initialize if not injected
+      await _initializePaymentBackend();
+    }
+    // Ensure the rest of the init logic is present
     print('CoordinatorService initialized with $_paymentBackendType backend.');
     await _initializeMatrixClient();
     await _checkExpiredFundedOffers();
@@ -658,9 +682,8 @@ class CoordinatorService {
     if (offer.status == OfferStatus.funded) {
       if (_paymentBackend != null) {
         try {
-          // await _paymentBackend!.cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
           await _paymentBackend!
-              .settleInvoice(preimageHex: offer.holdInvoicePreimage);
+              .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
           print(
               'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to expiration.');
         } catch (e) {
@@ -1358,7 +1381,7 @@ class CoordinatorService {
       final domain = parts[1];
       final lnurlpUrl = Uri.https(domain, '/.well-known/lnurlp/$username');
       print('LNURL: Requesting step 1 from $lnurlpUrl');
-      final response1 = await http.get(lnurlpUrl);
+      final response1 = await _httpClient.get(lnurlpUrl); // Use _httpClient
       if (response1.statusCode != 200) {
         print(
             'LNURL Error: Step 1 request failed (${response1.statusCode}) for $lightningAddress: ${response1.body}');
@@ -1394,7 +1417,7 @@ class CoordinatorService {
       queryParams['amount'] = amountMsats.toString();
       final finalUrl = callbackUri.replace(queryParameters: queryParams);
       print('LNURL: Requesting step 2 from $finalUrl');
-      final response2 = await http.get(finalUrl);
+      final response2 = await _httpClient.get(finalUrl); // Use _httpClient
       if (response2.statusCode != 200) {
         print(
             'LNURL Error: Step 2 request failed (${response2.statusCode}) for $lightningAddress: ${response2.body}');
