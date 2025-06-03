@@ -217,9 +217,13 @@ class CoordinatorService {
       double.tryParse(Platform.environment['TAKER_FEE'] ?? '') ??
           0.5; // Default to 0.5%
 
-  CoordinatorService(this._dbService, {PaymentService? paymentServiceForTest, Clock? clock, http.Client? httpClient})
+  CoordinatorService(this._dbService,
+      {PaymentService? paymentServiceForTest,
+      Clock? clock,
+      http.Client? httpClient})
       : _clock = clock ?? const Clock(),
-        _httpClient = httpClient ?? http.Client() { // Initialize _httpClient
+        _httpClient = httpClient ?? http.Client() {
+    // Initialize _httpClient
     if (paymentServiceForTest != null) {
       _paymentBackend = paymentServiceForTest;
       // Potentially set _paymentBackendType based on the type of paymentServiceForTest if needed
@@ -229,7 +233,8 @@ class CoordinatorService {
       // Or, we could require tests to also specify the type, or infer it.
       // Let's assume for now that if paymentServiceForTest is provided, _paymentBackendType might remain "none"
       // or be set to a generic "mock" or "test". The core logic relies on the _paymentBackend instance.
-      print('CoordinatorService initialized with injected payment backend for testing.');
+      print(
+          'CoordinatorService initialized with injected payment backend for testing.');
       // If a payment backend is injected, we assume it's already "connected" or its connect() is a no-op/mocked.
       // We also might want to set _paymentBackendType.
       // For now, let's set it to "injected_test_backend" to make it clear.
@@ -238,7 +243,8 @@ class CoordinatorService {
   }
 
   Future<void> init() async {
-    if (_paymentBackend == null) { // Only initialize if not injected
+    if (_paymentBackend == null) {
+      // Only initialize if not injected
       await _initializePaymentBackend();
     }
     // Ensure the rest of the init logic is present
@@ -686,9 +692,22 @@ class CoordinatorService {
               .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
           print(
               'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to expiration.');
+          sleep(Duration(seconds: 1));
+          final invoiceDetails = await _paymentBackend!
+              .lookupInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
+          // TODO this will not work for NWC, we need to handle it
+          if (invoiceDetails.status == InvoiceStatus.CANCELED) {
+            print(
+                'Verified invoice ${offer.holdInvoicePaymentHash} is cancelled via $_paymentBackendType.');
+          } else {
+            print(
+                'Warning: Invoice ${offer.holdInvoicePaymentHash} status is ${invoiceDetails.status}, expected CANCELED.');
+            return; // Exit if cancellation fails
+          }
         } catch (e) {
           print(
               'Error cancelling hold invoice for expired offer ${offer.id} using $_paymentBackendType: $e');
+          return; // Exit if cancellation fails
         }
       } else {
         print(

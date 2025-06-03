@@ -10,6 +10,7 @@ import 'payment_service.dart'; // Import the interface
 import '../models/invoice_status.dart';
 import '../models/invoice_update.dart';
 import '../models/create_hold_invoice_result.dart';
+import '../models/invoice_details.dart'; // Added import
 import '../models/pay_invoice_result.dart';
 
 // Import generated LND gRPC files (adjust paths/names if necessary)
@@ -151,7 +152,8 @@ class LndService implements PaymentService {
       InvoiceStatus status;
       switch (lndInvoice.state) {
         case Invoice_InvoiceState.ACCEPTED:
-          print("LND: lndInvoice ACCEPTED cltvExpiry=${lndInvoice.cltvExpiry} paidSats:${lndInvoice.amtPaidSat}");
+          print(
+              "LND: lndInvoice ACCEPTED cltvExpiry=${lndInvoice.cltvExpiry} paidSats:${lndInvoice.amtPaidSat}");
           status = InvoiceStatus.ACCEPTED;
           break;
         case Invoice_InvoiceState.SETTLED:
@@ -266,15 +268,13 @@ class LndService implements PaymentService {
             paymentPreimage: lndPaymentUpdate.paymentPreimage,
             feeSat: lndPaymentUpdate.feeSat.toInt(),
           );
-        } else if (lndPaymentUpdate.status ==
-            Payment_PaymentStatus.FAILED) {
+        } else if (lndPaymentUpdate.status == Payment_PaymentStatus.FAILED) {
           print(
               'LND: Payment FAILED. Reason: ${lndPaymentUpdate.failureReason}');
           return PayInvoiceResult(
             paymentError: lndPaymentUpdate.failureReason.toString(),
           );
-        } else if (lndPaymentUpdate.status ==
-            Payment_PaymentStatus.IN_FLIGHT) {
+        } else if (lndPaymentUpdate.status == Payment_PaymentStatus.IN_FLIGHT) {
           print('LND: Payment IN_FLIGHT for hash: $paymentHashHex');
           // Continue listening
         }
@@ -312,8 +312,7 @@ class LndService implements PaymentService {
       ..paymentHash = paymentHashBytes;
     try {
       await for (final update in _routerClient!.trackPaymentV2(req)) {
-        print(
-            '!!!!!!!!!!!!!!!!!!!!!!! LND: Payment status : ${update.status}');
+        print('!!!!!!!!!!!!!!!!!!!!!!! LND: Payment status : ${update.status}');
         if (update.status == Payment_PaymentStatus.SUCCEEDED) {
           print(
               'LND: trackPaymentV2: Payment SUCCEEDED. Preimage: ${update.paymentPreimage}');
@@ -337,6 +336,60 @@ class LndService implements PaymentService {
     } catch (e) {
       print('LND: Exception in trackPaymentV2 for $paymentHashHex: $e');
       return null;
+    }
+  }
+
+  /// Helper method to map LND invoice state to InvoiceStatus enum
+  InvoiceStatus _mapLndInvoiceStateToStatus(Invoice_InvoiceState state) {
+    switch (state) {
+      case Invoice_InvoiceState.OPEN:
+        return InvoiceStatus.OPEN;
+      case Invoice_InvoiceState.SETTLED:
+        return InvoiceStatus.SETTLED;
+      case Invoice_InvoiceState.CANCELED:
+        return InvoiceStatus.CANCELED;
+      case Invoice_InvoiceState.ACCEPTED:
+        return InvoiceStatus.ACCEPTED;
+      default:
+        return InvoiceStatus.UNKNOWN;
+    }
+  }
+
+  @override
+  Future<InvoiceDetails> lookupInvoice({required String paymentHashHex}) async {
+    if (_lightningClient == null) throw StateError('LND not connected.');
+    final paymentHashBytes = _hexToBytes(paymentHashHex);
+    final request = PaymentHash()..rHash = paymentHashBytes;
+    print('LND: Looking up invoice for hash: $paymentHashHex');
+    try {
+      final lndInvoice = await _lightningClient!.lookupInvoice(request);
+      return InvoiceDetails(
+        paymentHash: paymentHashHex,
+        description: lndInvoice.memo,
+        amountMsat: lndInvoice.value.toInt() * 1000, // Convert sats to msats
+        createdAt: lndInvoice.creationDate.toInt(),
+        settledAt: lndInvoice.settleDate.toInt() == 0
+            ? null
+            : lndInvoice.settleDate.toInt(), // LND uses 0 for not settled
+        invoice: lndInvoice.paymentRequest,
+        expiresAt: lndInvoice.creationDate.toInt() +
+            lndInvoice.expiry.toInt(), // LND expiry is duration from creation
+        status: _mapLndInvoiceStateToStatus(lndInvoice.state),
+        preimage: lndInvoice.rPreimage.isNotEmpty
+            ? String.fromCharCodes(lndInvoice.rPreimage)
+            : null, // LND returns bytes
+        feesPaidMsat:
+            null, // LND lookupInvoice doesn't directly provide fees paid for this invoice
+        type:
+            "incoming", // LND lookupInvoice is for invoices created by the node
+        // metadata: // LND htlcs could contain metadata, but not directly on Invoice object
+      );
+    } catch (e) {
+      print('LND: Error looking up invoice $paymentHashHex: $e');
+      return InvoiceDetails(
+        paymentHash: paymentHashHex,
+        error: 'LND: Error looking up invoice: ${e.toString()}',
+      );
     }
   }
 }

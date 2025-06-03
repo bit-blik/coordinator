@@ -9,6 +9,7 @@ import 'package:ndk/domain_layer/usecases/nwc/nwc_notification.dart';
 import 'package:ndk/ndk.dart';
 
 import '../models/create_hold_invoice_result.dart';
+import '../models/invoice_details.dart'; // Added import
 import '../models/invoice_status.dart';
 import '../models/invoice_update.dart';
 import '../models/pay_invoice_result.dart';
@@ -313,5 +314,63 @@ class NwcService implements PaymentService {
 
   static String bytesToHex(Uint8List bytes) {
     return hex.encode(bytes);
+  }
+
+  @override
+  Future<InvoiceDetails> lookupInvoice({required String paymentHashHex}) async {
+    if (_nwcConnection == null) {
+      throw Exception('NWC Service: Not connected.');
+    }
+    print('NWC Service: Looking up invoice for hash: $paymentHashHex');
+    try {
+      // The NDK's lookupInvoice returns a response object (e.g. NwcPayInvoiceResponse or LookupInvoiceResponse)
+      // which should have top-level fields like errorCode, errorMessage, and then specific invoice fields.
+      final nwcResponse = await _ndk.nwc.lookupInvoice(
+        _nwcConnection!,
+        paymentHash: paymentHashHex,
+      );
+
+      if (nwcResponse.errorCode != null) {
+        print(
+            'NWC Service: Error looking up invoice ${nwcResponse.paymentHash ?? paymentHashHex}: ${nwcResponse.errorCode} - ${nwcResponse.errorMessage}');
+        return InvoiceDetails(
+          paymentHash: nwcResponse.paymentHash ?? paymentHashHex,
+          error:
+              '${nwcResponse.errorCode}: ${nwcResponse.errorMessage ?? "Unknown NWC error"}',
+        );
+      }
+
+      // Determine status based on settledAt or other fields if available
+      InvoiceStatus? status;
+      if (nwcResponse.settledAt != null && nwcResponse.settledAt! > 0) {
+        status = InvoiceStatus.SETTLED;
+      } else {
+        status = InvoiceStatus.OPEN; // Default to OPEN if not settled
+      }
+      // NWC `lookup_invoice` doesn't have a direct 'status' field like LND.
+      // It's inferred. `type` ("incoming"/"outgoing") is more direct.
+
+      return InvoiceDetails(
+        paymentHash: nwcResponse.paymentHash ?? paymentHashHex,
+        type: nwcResponse.type, // NDK should provide this from the NWC response
+        invoice: nwcResponse.invoice,
+        description: nwcResponse.description,
+        descriptionHash: nwcResponse.descriptionHash,
+        preimage: nwcResponse.preimage,
+        amountMsat: nwcResponse.amount, // Assuming NDK returns it in msat
+        feesPaidMsat: nwcResponse.feesPaid, // Assuming NDK returns it in msat
+        createdAt: nwcResponse.createdAt,
+        expiresAt: nwcResponse.expiresAt,
+        settledAt: nwcResponse.settledAt,
+        // metadata: nwcResponse.metadata, // Removed as NWC response doesn't have this directly
+        status: status, // Inferred status
+      );
+    } catch (e) {
+      print('NWC Service: Exception in lookupInvoice for $paymentHashHex: $e');
+      return InvoiceDetails(
+        paymentHash: paymentHashHex,
+        error: 'Exception during NWC lookupInvoice: ${e.toString()}',
+      );
+    }
   }
 }
