@@ -304,15 +304,17 @@ class ApiService {
         // - not takerPaymentFailed
         // - or takerPaymentFailed and userPubkey matches taker_pubkey
         Offer? selectedOffer;
+        final now = DateTime.now().toUtc();
         for (final offer in activeOffers) {
           if (offer.status.name == 'takerPaymentFailed') {
             if (offer.takerPubkey == userPubkey) {
               selectedOffer = offer;
               break;
             }
-          } else if (offer.status.name == 'takerPaid') {
+          } else if (offer.status.name == 'takerPaid' && now.difference(offer.takerPaidAt!.toUtc()).inSeconds < 60 ) {
             // skip takerPaid offers from active
-            continue;
+            selectedOffer = offer;
+            break;
           } else {
             selectedOffer = offer;
             break;

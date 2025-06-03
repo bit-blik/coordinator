@@ -1,4 +1,5 @@
 import '../models/create_hold_invoice_result.dart';
+import '../models/invoice_details.dart'; // Added import
 import '../models/invoice_update.dart';
 import '../models/pay_invoice_result.dart';
 
@@ -47,4 +48,9 @@ abstract class PaymentService {
   /// Should emit an [InvoiceUpdate] when the invoice state changes (e.g., ACCEPTED, CANCELED).
   Stream<InvoiceUpdate> subscribeToInvoiceUpdates(
       {required String paymentHashHex});
+
+  /// Looks up an invoice by its payment hash.
+  /// [paymentHashHex]: The hex-encoded payment hash of the invoice.
+  /// Returns an [InvoiceDetails] object.
+  Future<InvoiceDetails> lookupInvoice({required String paymentHashHex});
 }

@@ -217,9 +217,13 @@ class CoordinatorService {
       double.tryParse(Platform.environment['TAKER_FEE'] ?? '') ??
           0.5; // Default to 0.5%
 
-  CoordinatorService(this._dbService, {PaymentService? paymentServiceForTest, Clock? clock, http.Client? httpClient})
+  CoordinatorService(this._dbService,
+      {PaymentService? paymentServiceForTest,
+      Clock? clock,
+      http.Client? httpClient})
       : _clock = clock ?? const Clock(),
-        _httpClient = httpClient ?? http.Client() { // Initialize _httpClient
+        _httpClient = httpClient ?? http.Client() {
+    // Initialize _httpClient
     if (paymentServiceForTest != null) {
       _paymentBackend = paymentServiceForTest;
       // Potentially set _paymentBackendType based on the type of paymentServiceForTest if needed
@@ -229,7 +233,8 @@ class CoordinatorService {
       // Or, we could require tests to also specify the type, or infer it.
       // Let's assume for now that if paymentServiceForTest is provided, _paymentBackendType might remain "none"
       // or be set to a generic "mock" or "test". The core logic relies on the _paymentBackend instance.
-      print('CoordinatorService initialized with injected payment backend for testing.');
+      print(
+          'CoordinatorService initialized with injected payment backend for testing.');
       // If a payment backend is injected, we assume it's already "connected" or its connect() is a no-op/mocked.
       // We also might want to set _paymentBackendType.
       // For now, let's set it to "injected_test_backend" to make it clear.
@@ -238,7 +243,8 @@ class CoordinatorService {
   }
 
   Future<void> init() async {
-    if (_paymentBackend == null) { // Only initialize if not injected
+    if (_paymentBackend == null) {
+      // Only initialize if not injected
       await _initializePaymentBackend();
     }
     // Ensure the rest of the init logic is present
@@ -389,9 +395,14 @@ class CoordinatorService {
             final success = await _dbService.updateOfferStatus(
               offer.id,
               OfferStatus.funded,
+              // Clear reservation related fields
+              takerPubkey: null,
+              reservedAt: null,
             );
             if (success) {
               revertedCount++;
+              // Restart the funded offer timer
+              _startFundedOfferTimer(offer); // offer object is available from the loop
             } else {
               print('Error reverting expired offer ${offer.id} on startup.');
             }
@@ -399,10 +410,17 @@ class CoordinatorService {
         } else {
           print(
               'Warning: Offer ${offer.id} is reserved but has no reserved_at timestamp. Reverting.');
-          final success =
-              await _dbService.updateOfferStatus(offer.id, OfferStatus.funded);
+          final success = await _dbService.updateOfferStatus(
+            offer.id,
+            OfferStatus.funded,
+            // Clear reservation related fields
+            takerPubkey: null,
+            reservedAt: null,
+          );
           if (success) {
             revertedCount++;
+            // Restart the funded offer timer
+            _startFundedOfferTimer(offer); // offer object is available from the loop
           } else {
             print(
                 'Error reverting reserved offer ${offer.id} with missing timestamp on startup.');
@@ -440,9 +458,15 @@ class CoordinatorService {
             final success = await _dbService.updateOfferStatus(
               offer.id,
               OfferStatus.funded,
+              // Clear BLIK related fields as well
+              blikCode: null,
+              takerLightningAddress: null,
+              blikReceivedAt: null,
             );
             if (success) {
               revertedCount++;
+              // Restart the funded offer timer
+              _startFundedOfferTimer(offer);
             } else {
               print(
                   'Error reverting expired BLIK confirmation for offer ${offer.id} on startup.');
@@ -451,10 +475,18 @@ class CoordinatorService {
         } else {
           print(
               'Warning: Offer ${offer.id} is in state ${offer.status} but has no blik_received_at timestamp. Reverting.');
-          final success =
-              await _dbService.updateOfferStatus(offer.id, OfferStatus.funded);
+          final success = await _dbService.updateOfferStatus(
+            offer.id,
+            OfferStatus.funded,
+            // Clear BLIK related fields as well
+            blikCode: null,
+            takerLightningAddress: null,
+            blikReceivedAt: null, // Though it's missing, good to be explicit
+          );
           if (success) {
             revertedCount++;
+            // Restart the funded offer timer
+            _startFundedOfferTimer(offer);
           } else {
             print(
                 'Error reverting offer ${offer.id} with missing BLIK timestamp on startup.');
@@ -668,13 +700,27 @@ class CoordinatorService {
 
   void _startFundedOfferTimer(Offer offer) {
     _fundedOfferTimers[offer.id]?.cancel();
-    print('Starting 10min funded offer expiration timer for offer ${offer.id}');
-    _fundedOfferTimers[offer.id] =
-        Timer(Duration(seconds: _fundedExpireTimeoutSeconds), () {
-      print('Funded offer expired for offer ${offer.id}');
-      _handleFundedOfferExpiration(offer);
+
+    final now = _clock.now().toUtc();
+    final expirationTime =
+        offer.createdAt.add(Duration(seconds: _fundedExpireTimeoutSeconds));
+    final remainingDuration = expirationTime.difference(now);
+
+    if (remainingDuration.isNegative || remainingDuration.inSeconds == 0) {
+      print(
+          'Offer ${offer.id} has already passed its expiration time. Handling expiration immediately.');
+      // Ensure it's not processed in a tight loop if already handled
       _fundedOfferTimers.remove(offer.id);
-    });
+      _handleFundedOfferExpiration(offer);
+    } else {
+      print(
+          'Starting funded offer expiration timer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s');
+      _fundedOfferTimers[offer.id] = Timer(remainingDuration, () {
+        print('Funded offer timer expired for offer ${offer.id}');
+        _handleFundedOfferExpiration(offer);
+        _fundedOfferTimers.remove(offer.id);
+      });
+    }
   }
 
   Future<void> _handleFundedOfferExpiration(Offer offer) async {
@@ -686,9 +732,22 @@ class CoordinatorService {
               .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
           print(
               'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to expiration.');
+          sleep(Duration(seconds: 1));
+          final invoiceDetails = await _paymentBackend!
+              .lookupInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
+          // TODO this will not work for NWC, we need to handle it
+          if (invoiceDetails.status == InvoiceStatus.CANCELED) {
+            print(
+                'Verified invoice ${offer.holdInvoicePaymentHash} is cancelled via $_paymentBackendType.');
+          } else {
+            print(
+                'Warning: Invoice ${offer.holdInvoicePaymentHash} status is ${invoiceDetails.status}, expected CANCELED.');
+            return; // Exit if cancellation fails
+          }
         } catch (e) {
           print(
               'Error cancelling hold invoice for expired offer ${offer.id} using $_paymentBackendType: $e');
+          return; // Exit if cancellation fails
         }
       } else {
         print(
@@ -854,6 +913,14 @@ class CoordinatorService {
     );
     if (success) {
       print('Offer $offerId successfully reverted to funded.');
+      // Restart the funded offer timer
+      final offer = await _dbService.getOfferById(offerId);
+      if (offer != null) {
+        _startFundedOfferTimer(offer);
+      } else {
+        print(
+            'Error: Could not find offer $offerId after reverting to funded to restart timer.');
+      }
     } else {
       print('Error reverting offer $offerId to funded in DB.');
     }
@@ -889,16 +956,24 @@ class CoordinatorService {
     print(
         '### COORDINATOR: Handling BLIK confirmation timeout for offer $offerId');
     final offer = await _dbService.getOfferById(offerId);
-    if (offer != null && (offer.status == OfferStatus.blikReceived)) {
+    if (offer != null &&
+        (offer.status == OfferStatus.blikReceived ||
+            offer.status == OfferStatus.blikSentToMaker)) {
       print(
-          'Offer $offerId BLIK confirmation timed out. Reverting status to funded.');
+          'Offer ${offer.id} BLIK confirmation timed out (status: ${offer.status}). Reverting status to funded.');
       final success = await _dbService.updateOfferStatus(
         offerId,
         OfferStatus.funded,
+        // Clear BLIK related fields as well
+        blikCode: null,
+        takerLightningAddress: null,
+        blikReceivedAt: null,
       );
       if (success) {
         print(
             'Offer $offerId status reverted to funded due to BLIK confirmation timeout.');
+        // Restart the funded offer timer
+        _startFundedOfferTimer(offer);
       } else {
         print(
             'Error reverting offer $offerId status after BLIK confirmation timeout.');
