@@ -669,7 +669,7 @@ class CoordinatorService {
       final notificationText =
           "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
       final simplexMsg = "#'Bitblik new offers' $notificationText";
-      final result = await run('simplex-chat -e "$simplexMsg"');
+      final result = await run('simplex-chat -e "$simplexMsg" --ha');
       if (result.first.stderr.isNotEmpty) {
         print('simplex command error: ${result.first.stderr}');
       }
