@@ -15,3 +15,5 @@ bin/server
 /.vscode/
 /.flutter-plugins
 /.flutter-plugins-dependencies
+tls.cert
+admin.macaroon
