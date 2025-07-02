@@ -239,6 +239,7 @@ class LndService implements PaymentService {
     }
 
     final request = lnd_router.SendPaymentRequest()
+      ..allowSelfPayment = true
       ..paymentRequest = invoice
       ..timeoutSeconds = 60; // Default timeout, consider making configurable
 
