@@ -18,3 +18,4 @@ bin/server
 tls.cert
 admin.macaroon
 /.env
+/bin/server.exe
