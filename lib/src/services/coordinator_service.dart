@@ -10,6 +10,8 @@ import 'package:crypto/crypto.dart'; // For SHA256
 import 'package:dotenv/dotenv.dart';
 import 'package:http/http.dart' as http; // For LNURL HTTP requests
 import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:path/path.dart' as path;
 import 'package:process_run/process_run.dart';
 
 import '../models/offer.dart';
@@ -274,13 +276,50 @@ class CoordinatorService {
     try {
       print(
           'Initializing Matrix client for $_matrixUser on $_matrixHomeserver... client name: $_matrixClientName');
-      _matrixClient = matrix.Client(_matrixClientName);
+      
+      // Initialize sqflite_common_ffi for server-side usage
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+      
+      // Create data directory for matrix database
+      final dataDir = Directory('data/matrix');
+      if (!await dataDir.exists()) {
+        await dataDir.create(recursive: true);
+      }
+      
+      final dbPath = path.join(dataDir.path, 'matrix_database.sqlite');
+      
+      // Create the database using sqflite_common_ffi
+      final database = await openDatabase(
+        dbPath,
+        version: 1,
+        onCreate: (db, version) async {
+          // Let the matrix SDK handle database creation
+          print('Matrix database created at $dbPath');
+        },
+      );
+      
+      // Initialize the matrix client with the new database approach
+      _matrixClient = matrix.Client(
+        _matrixClientName,
+        database: await matrix.MatrixSdkDatabase.init(
+          _matrixClientName,
+          database: database,
+        ),
+      );
+      
       await _matrixClient!.init();
+      
+      // Check homeserver
+      await _matrixClient!.checkHomeserver(Uri.parse(_matrixHomeserver));
+      
+      // Login
       final loginResponse = await _matrixClient!.login(
         matrix.LoginType.mLoginPassword,
         identifier: matrix.AuthenticationUserIdentifier(user: _matrixUser),
         password: _matrixPassword,
       );
+      
       print(
           'Matrix client logged in successfully as ${loginResponse.userId.localpart}');
     } catch (e) {
