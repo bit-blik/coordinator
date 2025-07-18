@@ -273,7 +273,7 @@ class CoordinatorService {
     }
     try {
       print(
-          'Initializing Matrix client for $_matrixUser on $_matrixHomeserver...');
+          'Initializing Matrix client for $_matrixUser on $_matrixHomeserver... client name: $_matrixClientName');
       _matrixClient = matrix.Client(_matrixClientName);
       await _matrixClient!.init();
       final loginResponse = await _matrixClient!.login(
