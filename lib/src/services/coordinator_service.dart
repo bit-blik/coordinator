@@ -36,6 +36,7 @@ class CoordinatorService {
 
   late final String _matrixHomeserver;
   late final String _matrixUser;
+  late final String _matrixClientName;
   late final String _matrixPassword;
   late final String _matrixRoomId;
 
@@ -214,6 +215,7 @@ class CoordinatorService {
 
     // Initialize all configuration values
     _matrixHomeserver = _env['MATRIX_HOMESERVER'] ?? 'https://matrix.org';
+    _matrixClientName = _env['MATRIX_CLIENT_NAME'] ?? 'BitBlik Coordinator';
     _matrixUser = _env['MATRIX_USER'] ?? '';
     _matrixPassword = _env['MATRIX_PASSWORD'] ?? '';
     _matrixRoomId = _env['MATRIX_ROOM'] ?? '';
@@ -272,7 +274,7 @@ class CoordinatorService {
     try {
       print(
           'Initializing Matrix client for $_matrixUser on $_matrixHomeserver...');
-      _matrixClient = matrix.Client('BitBlikCoordinator');
+      _matrixClient = matrix.Client(_matrixClientName);
       await _matrixClient!.init();
       final loginResponse = await _matrixClient!.login(
         matrix.LoginType.mLoginPassword,
