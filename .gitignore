@@ -17,3 +17,4 @@ bin/server
 /.flutter-plugins-dependencies
 tls.cert
 admin.macaroon
+/.env

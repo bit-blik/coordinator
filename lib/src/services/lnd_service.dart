@@ -5,6 +5,7 @@ import 'dart:typed_data'; // Required for Uint8List
 import 'package:grpc/grpc.dart';
 // Add path dependency if not already there
 import 'package:fixnum/fixnum.dart'; // Import fixnum for Int64
+import 'package:dotenv/dotenv.dart';
 
 import 'payment_service.dart'; // Import the interface
 import '../models/invoice_status.dart';
@@ -34,18 +35,16 @@ Uint8List _hexToBytes(String hex) {
   return Uint8List.fromList(bytes);
 }
 
-// Replace the hardcoded connection details with environment variables
-final _lndHost = Platform.environment['LND_HOST'] ?? 'localhost';
-final _lndPort = int.parse(Platform.environment['LND_PORT'] ?? '10009');
-final _tlsCertPath = Platform.environment['LND_CERT_PATH'] ?? 'tls.cert';
-final _macaroonPath =
-    Platform.environment['LND_MACAROON_PATH'] ?? 'admin.macaroon';
-
 class LndService implements PaymentService {
   ClientChannel? _channel;
   LightningClient? _lightningClient;
   InvoicesClient? _invoicesClient;
   lnd_router.RouterClient? _routerClient; // Use aliased type
+  late DotEnv _env;
+
+  LndService() {
+    _env = DotEnv(includePlatformEnvironment: true)..load();
+  }
 
   // backendType getter removed as it's not in the interface
 
@@ -53,25 +52,30 @@ class LndService implements PaymentService {
   Future<void> connect() async {
     if (_channel != null) return; // Already connected
 
+    final lndHost = _env['LND_HOST'] ?? 'localhost';
+    final lndPort = int.parse(_env['LND_PORT'] ?? '10009');
+    final tlsCertPath = _env['LND_CERT_PATH'] ?? 'tls.cert';
+    final macaroonPath = _env['LND_MACAROON_PATH'] ?? 'admin.macaroon';
+
     // Load TLS certificate
     final List<int> trustedRoots;
     try {
-      trustedRoots = await File(_tlsCertPath).readAsBytes();
+      trustedRoots = await File(tlsCertPath).readAsBytes();
     } catch (e) {
-      print('Error reading LND TLS certificate at $_tlsCertPath: $e');
+      print('Error reading LND TLS certificate at $tlsCertPath: $e');
       rethrow;
     }
     final channelCredentials = ChannelCredentials.secure(
       certificates: trustedRoots,
-      authority: _lndHost, // Specify the hostname/IP to verify against the cert
+      authority: lndHost, // Specify the hostname/IP to verify against the cert
     );
 
     // Load Macaroon
     final List<int> macaroonBytes;
     try {
-      macaroonBytes = await File(_macaroonPath).readAsBytes();
+      macaroonBytes = await File(macaroonPath).readAsBytes();
     } catch (e) {
-      print('Error reading LND macaroon at $_macaroonPath: $e');
+      print('Error reading LND macaroon at $macaroonPath: $e');
       rethrow;
     }
     // Convert macaroon bytes to hex string for metadata
@@ -82,8 +86,8 @@ class LndService implements PaymentService {
 
     // Create channel with TLS credentials
     _channel = ClientChannel(
-      _lndHost,
-      port: _lndPort,
+      lndHost,
+      port: lndPort,
       options: ChannelOptions(
           credentials: channelCredentials), // Base TLS credentials
     );

@@ -1,13 +1,13 @@
 import 'dart:async'; // For StreamSubscription, Timer
 import 'dart:convert'; // For jsonDecode
-import 'dart:io' show Platform; // To read environment variables
+import 'dart:io'; // For File operations
 import 'dart:math'; // For random preimage
 import 'dart:typed_data'; // For Uint8List
 
-import 'dart:io';
 import 'package:yaml/yaml.dart';
 import 'package:clock/clock.dart'; // Added for Clock
 import 'package:crypto/crypto.dart'; // For SHA256
+import 'package:dotenv/dotenv.dart';
 import 'package:http/http.dart' as http; // For LNURL HTTP requests
 import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
 import 'package:process_run/process_run.dart';
@@ -30,42 +30,32 @@ class CoordinatorService {
       "none"; // To track active backend: "lnd", "nwc", or "none"
   final Clock _clock; // Added for testable time
   final http.Client _httpClient; // Added for testable HTTP calls
+  late DotEnv _env;
 
   matrix.Client? _matrixClient; // Matrix client instance
 
-  final String _matrixHomeserver =
-      Platform.environment['MATRIX_HOMESERVER'] ?? 'https://matrix.org';
-  final String _matrixUser = Platform.environment['MATRIX_USER'] ?? '';
-  final String _matrixPassword = Platform.environment['MATRIX_PASSWORD'] ?? '';
-  final String _matrixRoomId = Platform.environment['MATRIX_ROOM'] ?? '';
+  late final String _matrixHomeserver;
+  late final String _matrixUser;
+  late final String _matrixPassword;
+  late final String _matrixRoomId;
 
   // Coordinator Info
-  static final String _coordinatorName =
-      Platform.environment['NAME'] ?? 'BitBlik Coordinator';
-  static final String _coordinatorIconUrl = Platform.environment['ICON_URL'] ??
-      'https://bitblik.app/splash/img/dark-2x.png';
-  static final String _coordinatorNostrNpub =
-      Platform.environment['NOSTR_NPUB'] ?? '';
+  late final String _coordinatorName;
+  late final String _coordinatorIconUrl;
+  late final String _coordinatorNostrNpub;
 
   // Offer amount limits
-  static final int _minAmountSats =
-      int.tryParse(Platform.environment['MIN_AMOUNT_SATS'] ?? '') ?? 1000;
-  static final int _maxAmountSats =
-      int.tryParse(Platform.environment['MAX_AMOUNT_SATS'] ?? '') ?? 250000;
+  late final int _minAmountSats;
+  late final int _maxAmountSats;
 
   // Supported currencies
-  static final List<String> _supportedCurrencies =
-      (Platform.environment['CURRENCIES']?.split(',') ?? ['PLN'])
-          .map((c) => c.trim().toUpperCase())
-          .toList();
+  late final List<String> _supportedCurrencies;
 
   // Reservation timeout configuration
-  static final int _reservationTimeoutSeconds =
-      int.tryParse(Platform.environment['RESERVATION_SECONDS'] ?? '') ?? 30;
+  late final int _reservationTimeoutSeconds;
 
   // Funded expire timeout configuration
-  static final int _fundedExpireTimeoutSeconds =
-      int.tryParse(Platform.environment['FUNDED_EXPIRY_SECONDS'] ?? '') ?? 600;
+  late final int _fundedExpireTimeoutSeconds;
 
   // Exchange rate cache
   double? _cachedPlnRate;
@@ -210,12 +200,8 @@ class CoordinatorService {
   final Map<String, Timer> _fundedOfferTimers = {};
 
   // Fee percentages, configurable via environment variables
-  static final double _makerFeePercentage =
-      double.tryParse(Platform.environment['MAKER_FEE'] ?? '') ??
-          0.5; // Default to 0.5%
-  static final double _takerFeePercentage =
-      double.tryParse(Platform.environment['TAKER_FEE'] ?? '') ??
-          0.5; // Default to 0.5%
+  late final double _makerFeePercentage;
+  late final double _takerFeePercentage;
 
   CoordinatorService(this._dbService,
       {PaymentService? paymentServiceForTest,
@@ -223,21 +209,41 @@ class CoordinatorService {
       http.Client? httpClient})
       : _clock = clock ?? const Clock(),
         _httpClient = httpClient ?? http.Client() {
-    // Initialize _httpClient
+    // Initialize dotenv
+    _env = DotEnv(includePlatformEnvironment: true)..load();
+
+    // Initialize all configuration values
+    _matrixHomeserver = _env['MATRIX_HOMESERVER'] ?? 'https://matrix.org';
+    _matrixUser = _env['MATRIX_USER'] ?? '';
+    _matrixPassword = _env['MATRIX_PASSWORD'] ?? '';
+    _matrixRoomId = _env['MATRIX_ROOM'] ?? '';
+
+    _coordinatorName = _env['NAME'] ?? 'BitBlik Coordinator';
+    _coordinatorIconUrl =
+        _env['ICON_URL'] ?? 'https://bitblik.app/splash/img/dark-2x.png';
+    _coordinatorNostrNpub = _env['NOSTR_NPUB'] ?? '';
+
+    _minAmountSats = int.tryParse(_env['MIN_AMOUNT_SATS'] ?? '') ?? 1000;
+    _maxAmountSats = int.tryParse(_env['MAX_AMOUNT_SATS'] ?? '') ?? 250000;
+
+    _supportedCurrencies = (_env['CURRENCIES']?.split(',') ?? ['PLN'])
+        .map((c) => c.trim().toUpperCase())
+        .toList();
+
+    _reservationTimeoutSeconds =
+        int.tryParse(_env['RESERVATION_SECONDS'] ?? '') ?? 30;
+    _fundedExpireTimeoutSeconds =
+        int.tryParse(_env['FUNDED_EXPIRY_SECONDS'] ?? '') ?? 600;
+
+    _makerFeePercentage =
+        double.tryParse(_env['MAKER_FEE'] ?? '') ?? 0.5; // Default to 0.5%
+    _takerFeePercentage =
+        double.tryParse(_env['TAKER_FEE'] ?? '') ?? 0.5; // Default to 0.5%
+
     if (paymentServiceForTest != null) {
       _paymentBackend = paymentServiceForTest;
-      // Potentially set _paymentBackendType based on the type of paymentServiceForTest if needed
-      // For now, tests will mock the behavior, so type string might be less critical in test scope.
-      // We also need to determine _paymentBackendType if a mock is injected.
-      // For simplicity in tests, we might not rely on _paymentBackendType string if _paymentBackend is mocked.
-      // Or, we could require tests to also specify the type, or infer it.
-      // Let's assume for now that if paymentServiceForTest is provided, _paymentBackendType might remain "none"
-      // or be set to a generic "mock" or "test". The core logic relies on the _paymentBackend instance.
       print(
           'CoordinatorService initialized with injected payment backend for testing.');
-      // If a payment backend is injected, we assume it's already "connected" or its connect() is a no-op/mocked.
-      // We also might want to set _paymentBackendType.
-      // For now, let's set it to "injected_test_backend" to make it clear.
       _paymentBackendType = "injected_test_backend";
     }
   }
@@ -282,8 +288,8 @@ class CoordinatorService {
   }
 
   Future<void> _initializePaymentBackend() async {
-    final nwcUri = Platform.environment['NWC_URI'];
-    final lndHost = Platform.environment['LND_HOST'];
+    final nwcUri = _env['NWC_URI'];
+    final lndHost = _env['LND_HOST'];
 
     if (nwcUri != null && nwcUri.isNotEmpty) {
       print('NWC_URI found. Initializing NwcService...');
@@ -402,7 +408,8 @@ class CoordinatorService {
             if (success) {
               revertedCount++;
               // Restart the funded offer timer
-              _startFundedOfferTimer(offer); // offer object is available from the loop
+              _startFundedOfferTimer(
+                  offer); // offer object is available from the loop
             } else {
               print('Error reverting expired offer ${offer.id} on startup.');
             }
@@ -420,7 +427,8 @@ class CoordinatorService {
           if (success) {
             revertedCount++;
             // Restart the funded offer timer
-            _startFundedOfferTimer(offer); // offer object is available from the loop
+            _startFundedOfferTimer(
+                offer); // offer object is available from the loop
           } else {
             print(
                 'Error reverting reserved offer ${offer.id} with missing timestamp on startup.');

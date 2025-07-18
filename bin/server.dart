@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:dotenv/dotenv.dart';
 import 'package:bitblik_coordinator/src/services/database_service.dart';
 import 'package:bitblik_coordinator/src/services/lnd_service.dart';
 import 'package:bitblik_coordinator/src/services/coordinator_service.dart';
@@ -9,8 +10,23 @@ import 'package:shelf_cors_headers/shelf_cors_headers.dart'; // Import CORS midd
 
 Future<void> main(List<String> args) async {
   // --- Configuration ---
-  // TODO: Load from environment variables or config file
-  final port = int.parse(Platform.environment['PORT'] ?? '8080');
+  // Load environment variables from .env file and platform environment
+  var env = DotEnv(includePlatformEnvironment: true)..load();
+
+  print('=== Configuration ===');
+  print('DB_HOST: ${env['DB_HOST'] ?? 'localhost'}');
+  print('DB_PORT: ${env['DB_PORT'] ?? '5432'}');
+  print('DB: ${env['DB'] ?? 'bitblik'}');
+  print('DB_USER: ${env['DB_USER'] ?? 'postgres'}');
+  print(
+      'DB_PASSWORD: ${env['DB_PASSWORD']?.isNotEmpty == true ? "[SET]" : "[NOT SET]"}');
+  print('LND_HOST: ${env['LND_HOST'] ?? 'localhost'}');
+  print('LND_PORT: ${env['LND_PORT'] ?? '10009'}');
+  print('LND_CERT_PATH: ${env['LND_CERT_PATH'] ?? 'tls.cert'}');
+  print('LND_MACAROON_PATH: ${env['LND_MACAROON_PATH'] ?? 'admin.macaroon'}');
+  print('PORT: ${env['PORT'] ?? '8080'}');
+  print('====================');
+
   final address = InternetAddress.anyIPv4;
 
   // --- Service Initialization ---
@@ -50,6 +66,7 @@ Future<void> main(List<String> args) async {
         .addHandler(apiService.handler); // Add API routes
 
     // Start the server
+    final port = int.parse(env['PORT'] ?? '8080');
     final server = await shelf_io.serve(pipeline, address, port);
     print('✅ Server listening on port ${server.port}');
 

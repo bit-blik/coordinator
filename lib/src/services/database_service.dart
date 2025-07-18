@@ -1,27 +1,33 @@
 import 'dart:io';
 import 'package:postgres/postgres.dart';
+import 'package:dotenv/dotenv.dart';
 import '../models/offer.dart';
-
-// Load connection details from environment variables, defaulting to localhost and 5432
-final _dbHost = Platform.environment['DB_HOST'] ?? 'localhost';
-final _dbPort = int.tryParse(Platform.environment['DB_PORT'] ?? '') ?? 5432;
-final _dbName = Platform.environment['DB'] ?? 'bitblik';
-final _dbUser = Platform.environment['DB_USER'] ?? 'postgres'; // Replace with your DB user
-final _dbPassword = Platform.environment['DB_PASSWORD'] ?? '**********'; // Replace with your DB password
 
 class DatabaseService {
   PostgreSQLConnection? _connection;
+  late DotEnv _env;
+
+  DatabaseService() {
+    _env = DotEnv(includePlatformEnvironment: true)..load();
+  }
 
   Future<void> connect() async {
     if (_connection?.isClosed == false) {
       return; // Already connected
     }
+
+    final dbHost = _env['DB_HOST'] ?? 'localhost';
+    final dbPort = int.tryParse(_env['DB_PORT'] ?? '') ?? 5432;
+    final dbName = _env['DB'] ?? 'bitblik';
+    final dbUser = _env['DB_USER'] ?? 'postgres';
+    final dbPassword = _env['DB_PASSWORD'] ?? '**********';
+
     _connection = PostgreSQLConnection(
-      _dbHost,
-      _dbPort,
-      _dbName,
-      username: _dbUser,
-      password: _dbPassword,
+      dbHost,
+      dbPort,
+      dbName,
+      username: dbUser,
+      password: dbPassword,
     );
     try {
       await _connection!.open();
