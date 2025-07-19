@@ -134,5 +134,17 @@ class Offer {
         'settled_at': settledAt?.toIso8601String(),
         'fiat_amount': fiatAmount,
         'fiat_currency': fiatCurrency,
-      };
+        'amount_sats': amountSats,
+        'maker_fees': makerFees,
+    // 'maker_pubkey': offer.makerPubkey,
+    // 'taker_pubkey': offer.takerPubkey,
+    // 'taker_lightning_address': offer.takerLightningAddress,
+        'status': status.name,
+        'hold_invoice_payment_hash': holdInvoicePaymentHash,
+    // 'blik_code': offer.blikCode, // Include BLIK code
+    // 'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
+    // 'fiat_amount': offer.fiatAmount,
+    // 'fiat_currency': offer.fiatCurrency,
+        'taker_fees': takerFees,
+  };
 }

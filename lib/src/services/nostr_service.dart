@@ -9,6 +9,7 @@ import 'package:ndk/shared/nips/nip19/nip19.dart';
 import 'package:ndk/shared/nips/nip44/nip44.dart';
 
 import 'coordinator_service.dart';
+import '../models/offer.dart';
 
 /// Service to handle Nostr communication for the coordinator
 /// Implements info replaceable events and NIP-44 encrypted request/response
@@ -161,7 +162,8 @@ class NostrService {
         'offer_id': offerId,
         'payment_hash': paymentHash,
         'status': status,
-        'timestamp': timestamp.toUtc(),
+        'timestamp': timestamp.millisecondsSinceEpoch ~/
+            1000, // Unix timestamp in seconds
       };
 
       final statusUpdateJson = jsonEncode(statusUpdate);
@@ -393,7 +395,7 @@ class NostrService {
               await _coordinatorService.getMyActiveOffers(userPubkey);
           if (activeOffers.isNotEmpty) {
             final offer = activeOffers.first;
-            return _offerToJson(offer);
+            return offer.toJson();
           } else {
             return {};
           }
@@ -410,10 +412,11 @@ class NostrService {
               .toList();
 
           final finishedList =
-              finished.map((offer) => _offerToJson(offer)).toList();
+              finished.map((offer) => offer.toJson()).toList();
           return {'offers': finishedList};
 
         case 'cancel_offer':
+          PILA Error handling request: Exception: Error processing request: PostgreSQLSeverity.error 22P02: invalid input syntax for type uuid: "unknown_id"
           final offerId = params['offer_id'] as String?;
           if (offerId == null) {
             throw Exception('Missing required parameter: offer_id');
@@ -515,26 +518,26 @@ class NostrService {
   }
 
   /// Convert offer to JSON format
-  Map<String, dynamic> _offerToJson(dynamic offer) {
-    return {
-      'id': offer.id,
-      'amount_sats': offer.amountSats,
-      'maker_fees': offer.makerFees,
-      'maker_pubkey': offer.makerPubkey,
-      'taker_pubkey': offer.takerPubkey,
-      'taker_lightning_address': offer.takerLightningAddress,
-      'status': offer.status.name,
-      'created_at': offer.createdAt.toIso8601String(),
-      'reserved_at': offer.reservedAt?.toIso8601String(),
-      'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
-      'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
-      'blik_code': offer.blikCode,
-      'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
-      'fiat_amount': offer.fiatAmount,
-      'fiat_currency': offer.fiatCurrency,
-      'taker_fees': offer.takerFees,
-    };
-  }
+  // Map<String, dynamic> _offerToJson(dynamic offer) {
+  //   return {
+  //     'id': offer.id,
+  //     'amount_sats': offer.amountSats,
+  //     'maker_fees': offer.makerFees,
+  //     'maker_pubkey': offer.makerPubkey,
+  //     'taker_pubkey': offer.takerPubkey,
+  //     'taker_lightning_address': offer.takerLightningAddress,
+  //     'status': offer.status.name,
+  //     'created_at': offer.createdAt.toIso8601String(),
+  //     'reserved_at': offer.reservedAt?.toIso8601String(),
+  //     'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
+  //     'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
+  //     'blik_code': offer.blikCode,
+  //     'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
+  //     'fiat_amount': offer.fiatAmount,
+  //     'fiat_currency': offer.fiatCurrency,
+  //     'taker_fees': offer.takerFees,
+  //   };
+  // }
 
   /// Send a successful response
   Future<void> _sendResponse(String recipientPubkey, String requestId,
@@ -598,7 +601,8 @@ class NostrService {
       );
 
       await _signer.sign(event);
-      await _ndk.broadcast.broadcast(nostrEvent: event, specificRelays: _relays);
+      await _ndk.broadcast
+          .broadcast(nostrEvent: event, specificRelays: _relays);
 
       print('Sent encrypted response to $recipientPubkey');
     } catch (e) {
