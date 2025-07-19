@@ -151,7 +151,6 @@ class NostrService {
     required String offerId,
     required String paymentHash,
     required String status,
-    required String coordinatorPubkey,
     required DateTime timestamp,
     required String makerPubkey,
     String? takerPubkey,
@@ -162,7 +161,6 @@ class NostrService {
         'offerId': offerId,
         'paymentHash': paymentHash,
         'status': status,
-        'coordinatorPubkey': coordinatorPubkey,
         'timestamp': timestamp.toIso8601String(),
       };
 
@@ -213,8 +211,6 @@ class NostrService {
         tags: [
           ['p', recipientPubkey], // Tag recipient
           ['offer_id', offerId],
-          ['payment_hash', paymentHash],
-          ['status', status],
         ].map((tag) => tag.map((t) => t.toString()).toList()).toList(),
         createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );

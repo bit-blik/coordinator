@@ -48,7 +48,6 @@ class CoordinatorService {
   // Coordinator Info
   late final String _coordinatorName;
   late final String _coordinatorIconUrl;
-  late final String _coordinatorNostrNpub;
 
   // Offer amount limits
   late final int _minAmountSats;
@@ -230,8 +229,6 @@ class CoordinatorService {
     _coordinatorName = _env['NAME'] ?? 'BitBlik Coordinator';
     _coordinatorIconUrl =
         _env['ICON_URL'] ?? 'https://bitblik.app/splash/img/dark-2x.png';
-    _coordinatorNostrNpub =
-        _calculateNpubFromPrivateKey(_env['NOSTR_PRIVATE_KEY'] ?? '');
 
     _minAmountSats = int.tryParse(_env['MIN_AMOUNT_SATS'] ?? '') ?? 1000;
     _maxAmountSats = int.tryParse(_env['MAX_AMOUNT_SATS'] ?? '') ?? 250000;
@@ -898,9 +895,6 @@ class CoordinatorService {
 
     if (_coordinatorIconUrl.isNotEmpty) {
       info['icon'] = _coordinatorIconUrl;
-    }
-    if (_coordinatorNostrNpub.isNotEmpty) {
-      info['nostr_npub'] = _coordinatorNostrNpub;
     }
 
     // Read version from pubspec.yaml
@@ -1743,7 +1737,6 @@ class CoordinatorService {
         offerId: offer.id,
         paymentHash: offer.holdInvoicePaymentHash,
         status: offer.status.name,
-        coordinatorPubkey: _coordinatorNostrNpub,
         timestamp: DateTime.now().toUtc(),
         makerPubkey: offer.makerPubkey,
         takerPubkey: offer.takerPubkey,
