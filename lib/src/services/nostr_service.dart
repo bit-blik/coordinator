@@ -161,7 +161,7 @@ class NostrService {
         'offer_id': offerId,
         'payment_hash': paymentHash,
         'status': status,
-        'timestamp': timestamp.toIso8601String(),
+        'timestamp': timestamp.toUtc(),
       };
 
       final statusUpdateJson = jsonEncode(statusUpdate);
