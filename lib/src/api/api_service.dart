@@ -21,7 +21,6 @@ class ApiService {
         '/offers/<offerId>/update-invoice', _updateTakerInvoiceHandler);
     _router.get('/my-active-offer', _getMyActiveOfferHandler);
     _router.get('/my-finished-offers', _getMyFinishedOffersHandler);
-    _router.get('/offer-status/<paymentHash>', _getOfferStatusHandler);
     _router.post(
         '/offers/<offerId>/retry-taker-payment', _retryTakerPaymentHandler);
     _router.delete(
@@ -311,7 +310,8 @@ class ApiService {
               selectedOffer = offer;
               break;
             }
-          } else if (offer.status.name == 'takerPaid' && now.difference(offer.takerPaidAt!.toUtc()).inSeconds < 60 ) {
+          } else if (offer.status.name == 'takerPaid' &&
+              now.difference(offer.takerPaidAt!.toUtc()).inSeconds < 60) {
             // skip takerPaid offers from active
             selectedOffer = offer;
             break;
@@ -409,26 +409,6 @@ class ApiService {
       return Response.internalServerError(
           body: jsonEncode(
               {'error': 'Failed to get finished offers: ${e.toString()}'}));
-    }
-  }
-
-  Future<Response> _getOfferStatusHandler(
-      Request request, String paymentHash) async {
-    try {
-      final offer =
-          await _coordinatorService.getOfferByPaymentHash(paymentHash);
-      if (offer != null) {
-        return Response.ok(jsonEncode({'status': offer.status.name}),
-            headers: {'Content-Type': 'application/json'});
-      } else {
-        return Response.ok(jsonEncode({'status': 'pending_creation'}),
-            headers: {'Content-Type': 'application/json'});
-      }
-    } catch (e) {
-      print('Error in _getOfferStatusHandler: $e');
-      return Response.internalServerError(
-          body: jsonEncode(
-              {'error': 'Failed to get offer status: ${e.toString()}'}));
     }
   }
 

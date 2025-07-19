@@ -1,12 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
-import 'package:shelf/shelf.dart';
-import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:dotenv/dotenv.dart';
 import 'package:bitblik_coordinator/src/services/database_service.dart';
 import 'package:bitblik_coordinator/src/services/lnd_service.dart';
 import 'package:bitblik_coordinator/src/services/coordinator_service.dart';
-import 'package:bitblik_coordinator/src/api/api_service.dart';
-import 'package:shelf_cors_headers/shelf_cors_headers.dart'; // Import CORS middleware
+import 'package:bitblik_coordinator/src/services/nostr_service.dart';
 
 Future<void> main(List<String> args) async {
   // --- Configuration ---
@@ -24,16 +22,17 @@ Future<void> main(List<String> args) async {
   print('LND_PORT: ${env['LND_PORT'] ?? '10009'}');
   print('LND_CERT_PATH: ${env['LND_CERT_PATH'] ?? 'tls.cert'}');
   print('LND_MACAROON_PATH: ${env['LND_MACAROON_PATH'] ?? 'admin.macaroon'}');
-  print('PORT: ${env['PORT'] ?? '8080'}');
+  print(
+      'NOSTR_PRIVATE_KEY: ${env['NOSTR_PRIVATE_KEY']?.isNotEmpty == true ? "[SET]" : "[NOT SET]"}');
+  print(
+      'NOSTR_RELAYS: ${env['NOSTR_RELAYS'] ?? 'wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net,wss://offchain.pub'}');
   print('====================');
-
-  final address = InternetAddress.anyIPv4;
 
   // --- Service Initialization ---
   final dbService = DatabaseService();
   final lndService = LndService();
   CoordinatorService? coordinatorService; // Nullable initially
-  ApiService? apiService; // Nullable initially
+  NostrService? nostrService; // Nullable initially
 
   try {
     // Connect to Database
@@ -42,64 +41,79 @@ Future<void> main(List<String> args) async {
     coordinatorService = CoordinatorService(dbService);
     await coordinatorService.init();
 
-    // Initialize API Service (depends on Coordinator)
-    apiService = ApiService(coordinatorService);
+    // Initialize Nostr Service (replaces HTTP API)
+    final relays = env['NOSTR_RELAYS']?.split(',') ??
+        [
+          'wss://relay.damus.io',
+          'wss://nos.lol',
+          'wss://relay.primal.net',
+          'wss://offchain.pub'
+        ];
 
-    // --- Server Setup ---
-    // Define more specific CORS headers map
-    final _corsHeadersMap = {
-      // Renamed variable
-      'Access-Control-Allow-Origin':
-          '*', // Allow all origins (adjust for production)
-      'Access-Control-Allow-Methods':
-          'GET, POST, OPTIONS, DELETE', // Allow common methods + DELETE
-      'Access-Control-Allow-Headers':
-          'Origin, Content-Type, X-Requested-With, x-maker-id, x-user-pubkey', // Added x-user-pubkey
-    };
+    nostrService = NostrService(
+      coordinatorService,
+      relays: relays,
+    );
 
-    // Create Shelf pipeline
-    final pipeline = Pipeline()
-        .addMiddleware(logRequests()) // Basic request logging
-        // Use the corsHeaders function with the renamed headers map
-        .addMiddleware(
-            corsHeaders(headers: _corsHeadersMap)) // Use renamed map variable
-        .addHandler(apiService.handler); // Add API routes
+    await nostrService.init(privateKey: env['NOSTR_PRIVATE_KEY'] ?? '');
 
-    // Start the server
-    final port = int.parse(env['PORT'] ?? '8080');
-    final server = await shelf_io.serve(pipeline, address, port);
-    print('✅ Server listening on port ${server.port}');
+    // Set the Nostr service in the coordinator service for status updates
+    coordinatorService.setNostrService(nostrService);
+
+    print('✅ Coordinator running on Nostr with relays: $relays');
+    print(
+        '✅ Coordinator pubkey: ${nostrService.coordinatorPubkey ?? 'Unknown'}');
 
     // --- Graceful Shutdown ---
     // Listen for termination signals
     ProcessSignal.sigint.watch().listen((signal) async {
       print('\nReceived SIGINT, shutting down...');
-      await server.close(force: true); // Close HTTP server
+      await nostrService?.disconnect(); // Disconnect from Nostr
       await lndService.disconnect(); // Disconnect from LND
       await dbService.disconnect(); // Disconnect from DB
-      if (coordinatorService != null) {
-        // coordinatorService.dispose(); // Add dispose method if needed
-      }
       print('Shutdown complete.');
       exit(0);
     });
 
     ProcessSignal.sigterm.watch().listen((signal) async {
       print('\nReceived SIGTERM, shutting down...');
-      await server.close(force: true);
+      await nostrService?.disconnect();
       await lndService.disconnect();
       await dbService.disconnect();
-      if (coordinatorService != null) {
-        // coordinatorService.dispose();
-      }
       print('Shutdown complete.');
       exit(0);
     });
+
+    // Keep the process running
+    await _keepAlive();
   } catch (e) {
     print('❌ Error during server startup: $e');
     // Attempt cleanup even on startup error
+    await nostrService?.disconnect();
     await lndService.disconnect();
     await dbService.disconnect();
     exit(1);
+  }
+}
+
+/// Keep the process alive by listening to stdin
+Future<void> _keepAlive() async {
+  print('Coordinator is running. Press Ctrl+C to stop.');
+
+  // Listen to stdin to keep the process alive
+  await for (final line in stdin
+      .transform(const SystemEncoding().decoder)
+      .transform(const LineSplitter())) {
+    if (line.toLowerCase() == 'quit' || line.toLowerCase() == 'exit') {
+      print('Shutting down...');
+      exit(0);
+    } else if (line.toLowerCase() == 'status') {
+      print('Coordinator is running normally.');
+    } else if (line.toLowerCase() == 'help') {
+      print('Available commands:');
+      print('  status - Show coordinator status');
+      print('  quit/exit - Shutdown coordinator');
+      print('  help - Show this help message');
+    }
   }
 }

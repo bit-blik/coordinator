@@ -5,7 +5,7 @@ version: 0.2.6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
-
+publish_to: none
 # Add regular dependencies here.
 dependencies:
   postgres: ^2.6.1 # Or latest version
@@ -22,11 +22,13 @@ dependencies:
   sqlite3: ^2.7.7 # For SQLite3 support in native environments
   sqflite_common_ffi: ^2.3.6 # For server-side SQLite support
   yaml: ^3.1.3
+  bip340: ^0.3.0
+  logger: ^2.5.0
   dotenv: ^4.2.0 # For loading environment variables from .env file
   ndk:
     git:
       url: https://github.com/relaystr/ndk.git
-      ref: 5a89be2ba21dd066a94b1f83aeba7ee42e75ea6a
+      ref: d6b69e61d2857abf70e1011bb2af080cd4d433d2
       path: packages/ndk
   #flutter_olm: ^2.0.0
   #flutter_openssl_crypto: ^0.5.0
