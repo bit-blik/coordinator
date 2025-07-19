@@ -22,7 +22,6 @@ import 'payment_service.dart';
 import '../models/invoice_status.dart';
 import '../models/invoice_update.dart';
 import 'nostr_service.dart';
-import 'package:ndk/ndk.dart';
 
 // Set to Duration.zero for production
 const Duration _kDebugDelayDuration = Duration(seconds: 0);
@@ -255,36 +254,36 @@ class CoordinatorService {
     }
   }
 
-  /// Calculate npub from NOSTR private key
-  String _calculateNpubFromPrivateKey(String privateKey) {
-    if (privateKey.isEmpty) {
-      return '';
-    }
-
-    try {
-      // Decode nsec key if it's in bech32 format, otherwise assume hex
-      String hexPrivateKey = privateKey;
-      if (privateKey.startsWith('nsec1')) {
-        // For now, let NDK handle the nsec decoding when creating the signer
-        // We'll create a temporary signer to get the public key
-        final tempSigner = Bip340EventSigner(
-          privateKey: privateKey,
-          publicKey: '', // Will be derived
-        );
-        return tempSigner.getPublicKey();
-      } else {
-        // Assume it's already in hex format
-        final signer = Bip340EventSigner(
-          privateKey: hexPrivateKey,
-          publicKey: '', // Will be derived
-        );
-        return signer.getPublicKey();
-      }
-    } catch (e) {
-      print('Error calculating npub from private key: $e');
-      return '';
-    }
-  }
+  // /// Calculate npub from NOSTR private key
+  // String _calculateNpubFromPrivateKey(String privateKey) {
+  //   if (privateKey.isEmpty) {
+  //     return '';
+  //   }
+  //
+  //   try {
+  //     // Decode nsec key if it's in bech32 format, otherwise assume hex
+  //     String hexPrivateKey = privateKey;
+  //     if (privateKey.startsWith('nsec1')) {
+  //       // For now, let NDK handle the nsec decoding when creating the signer
+  //       // We'll create a temporary signer to get the public key
+  //       final tempSigner = Bip340EventSigner(
+  //         privateKey: privateKey,
+  //         publicKey: '', // Will be derived
+  //       );
+  //       return tempSigner.getPublicKey();
+  //     } else {
+  //       // Assume it's already in hex format
+  //       final signer = Bip340EventSigner(
+  //         privateKey: hexPrivateKey,
+  //         publicKey: '', // Will be derived
+  //       );
+  //       return signer.getPublicKey();
+  //     }
+  //   } catch (e) {
+  //     print('Error calculating npub from private key: $e');
+  //     return '';
+  //   }
+  // }
 
   Future<void> init() async {
     if (_paymentBackend == null) {

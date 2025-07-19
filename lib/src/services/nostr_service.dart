@@ -49,7 +49,7 @@ class NostrService {
           cache: MemCacheManager(),
           eventVerifier: Bip340EventVerifier(),
           bootstrapRelays: _relays,
-          logLevel: lib_logger.Level.info),
+          logLevel: lib_logger.Level.trace),
     );
 
     // Generate or load coordinator keys
@@ -99,7 +99,7 @@ class NostrService {
 
       // Simple bech32 decoding for nsec keys
       // This is a basic implementation - in production you'd use a proper bech32 library
-      final data = nsecKey.substring(5); // Remove 'nsec1' prefix
+      // final data = nsecKey.substring(5); // Remove 'nsec1' prefix
 
       // For now, return the input as-is since NDK should handle nsec decoding
       // In a full implementation, you'd decode the bech32 format properly
@@ -130,7 +130,7 @@ class NostrService {
 
       final event = Nip01Event(
         kind: KIND_COORDINATOR_INFO,
-        pubKey: _signer.getPublicKey()!,
+        pubKey: _signer.getPublicKey(),
         content: '',
         tags: tags.map((tag) => tag.map((t) => t.toString()).toList()).toList(),
         createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -158,8 +158,8 @@ class NostrService {
     try {
       // Create the status update content
       final statusUpdate = {
-        'offerId': offerId,
-        'paymentHash': paymentHash,
+        'offer_id': offerId,
+        'payment_hash': paymentHash,
         'status': status,
         'timestamp': timestamp.toIso8601String(),
       };
@@ -598,7 +598,7 @@ class NostrService {
       );
 
       await _signer.sign(event);
-      await _ndk.broadcast.broadcast(nostrEvent: event);
+      await _ndk.broadcast.broadcast(nostrEvent: event, specificRelays: _relays);
 
       print('Sent encrypted response to $recipientPubkey');
     } catch (e) {

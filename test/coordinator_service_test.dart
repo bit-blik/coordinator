@@ -359,7 +359,7 @@ void main() {
     });
 
     test('Invoice ACCEPTED: (pending) -> funded', () async {
-      final paymentHash = 'funded-payment-hash';
+      // final paymentHash = 'funded-payment-hash';
       final makerId = 'maker-for-funded';
       final fiatAmount = 150.0;
       // final satsAmountCalc = 300000; // Example, actual would be calculated

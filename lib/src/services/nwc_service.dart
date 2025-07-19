@@ -332,9 +332,9 @@ class NwcService implements PaymentService {
 
       if (nwcResponse.errorCode != null) {
         print(
-            'NWC Service: Error looking up invoice ${nwcResponse.paymentHash ?? paymentHashHex}: ${nwcResponse.errorCode} - ${nwcResponse.errorMessage}');
+            'NWC Service: Error looking up invoice ${nwcResponse.paymentHash}: ${nwcResponse.errorCode} - ${nwcResponse.errorMessage}');
         return InvoiceDetails(
-          paymentHash: nwcResponse.paymentHash ?? paymentHashHex,
+          paymentHash: nwcResponse.paymentHash,
           error:
               '${nwcResponse.errorCode}: ${nwcResponse.errorMessage ?? "Unknown NWC error"}',
         );
@@ -351,7 +351,7 @@ class NwcService implements PaymentService {
       // It's inferred. `type` ("incoming"/"outgoing") is more direct.
 
       return InvoiceDetails(
-        paymentHash: nwcResponse.paymentHash ?? paymentHashHex,
+        paymentHash: nwcResponse.paymentHash,
         type: nwcResponse.type, // NDK should provide this from the NWC response
         invoice: nwcResponse.invoice,
         description: nwcResponse.description,
