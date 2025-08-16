@@ -207,6 +207,8 @@ class CoordinatorService {
   late final double _makerFeePercentage;
   late final double _takerFeePercentage;
 
+  late final _simplexGroup;
+
   CoordinatorService(this._dbService,
       {PaymentService? paymentServiceForTest,
       Clock? clock,
@@ -224,6 +226,8 @@ class CoordinatorService {
     _matrixUser = _env['MATRIX_USER'] ?? '';
     _matrixPassword = _env['MATRIX_PASSWORD'] ?? '';
     _matrixRoomId = _env['MATRIX_ROOM'] ?? '';
+
+    _simplexGroup = _env['SIMPLEX_GROUP'] ?? 'Bitblik new offers';
 
     _coordinatorName = _env['NAME'] ?? 'BitBlik Coordinator';
     _coordinatorIconUrl =
@@ -774,7 +778,7 @@ class CoordinatorService {
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final notificationText =
           "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
-      final simplexMsg = "#'Bitblik new offers' $notificationText";
+      final simplexMsg = "#'$_simplexGroup' $notificationText";
       final result = await run('simplex-chat -e "$simplexMsg" --ha');
       if (result.first.stderr.isNotEmpty) {
         print('simplex command error: ${result.first.stderr}');
