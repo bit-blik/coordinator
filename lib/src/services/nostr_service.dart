@@ -416,7 +416,7 @@ class NostrService {
           return {'offers': finishedList};
 
         case 'cancel_offer':
-          PILA Error handling request: Exception: Error processing request: PostgreSQLSeverity.error 22P02: invalid input syntax for type uuid: "unknown_id"
+          //PILA Error handling request: Exception: Error processing request: PostgreSQLSeverity.error 22P02: invalid input syntax for type uuid: "unknown_id"
           final offerId = params['offer_id'] as String?;
           if (offerId == null) {
             throw Exception('Missing required parameter: offer_id');
