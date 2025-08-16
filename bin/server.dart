@@ -22,6 +22,7 @@ Future<void> main(List<String> args) async {
   print('LND_PORT: ${env['LND_PORT'] ?? '10009'}');
   print('LND_CERT_PATH: ${env['LND_CERT_PATH'] ?? 'tls.cert'}');
   print('LND_MACAROON_PATH: ${env['LND_MACAROON_PATH'] ?? 'admin.macaroon'}');
+  print('SIMPLEX_GROUP: ${env['SIMPLEX_GROUP'] ?? 'Bitblik new offers'}');
   print(
       'NOSTR_PRIVATE_KEY: ${env['NOSTR_PRIVATE_KEY']?.isNotEmpty == true ? "[SET]" : "[NOT SET]"}');
   print(
