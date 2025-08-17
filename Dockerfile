@@ -20,7 +20,11 @@ RUN dart pub get
 RUN dart compile exe bin/server.dart -o bin/server
 # Build minimal serving image from AOT-compiled `/server` and required system
 # libraries and configuration files stored in `/runtime/` from the build stage.
-FROM scratch
+
+#FROM scratch
+FROM alpine:latest
+RUN apk add --no-cache zlib
+
 COPY --from=build /runtime/ /
 COPY --from=build /app/bin/server /app/bin/
 COPY --from=build /app/simplex-chat /app/
