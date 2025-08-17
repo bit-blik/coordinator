@@ -1,11 +1,12 @@
 - nostr
+    - listAvailableOffers should be nostr push subscription instead of poll
     - multiple coordinators (from DVM/nostr announced?)
         - list of default accepted coordinator's npubs
         - add custom one (store in client preferences)
+    - remove circular dependency between coordinator/nostr services !!
     - use ndk.accounts instead of single signer
         - backup/restore keys
         - re-generate new keys
-
 
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
