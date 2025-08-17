@@ -1,12 +1,19 @@
-- tests
+- nostr
+    - multiple coordinators (from DVM/nostr announced?)
+        - list of default accepted coordinator's npubs
+        - add custom one (store in client preferences)
+    - use ndk.accounts instead of single signer
+        - backup/restore keys
+        - re-generate new keys
+
+
+- NWC wallet integration
+    - ndk.wallets (NWC) from leo's branch
+
 - settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 - transaction to dispute state
-- sign the api requests with priv key
 - fidelity bond for taker
-- refactor to use websockets / nostr
 - check leaking details on api json
-- telegram bot
-- multiple coordinators (from DVM/nostr announced?)
 - while in /taker-conflict if maker confirms it should refresh and show taker success
 
 - better details on MakerSuccessScreen
@@ -14,20 +21,18 @@
 
 - timer countdown of 2min for validity of blik code in both taker/maker screens with info what to do next.
 - in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
-- backup/restore keys
 
 - sound effects when status changes
-- coordinator /admin/* for admin actions on allowed pubkeys
+- local notifications when status changes
+- telegram bot
 
 ======
-- NWC wallet integration
-- re-generate new keys
-
-======
-- tests
 - dark theme
-- stats like https://plebqr.com/ for coordinator
+
+======
 - extract common code between coordinator & client (offer model)
+- coordinator /admin/* for admin actions on allowed pubkeys
+- stats like https://plebqr.com/ for coordinator
 - why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
-- other options except simplex (webpushs/telegram bot?)
+- webpushs
 

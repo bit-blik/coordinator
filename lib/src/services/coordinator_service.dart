@@ -780,12 +780,13 @@ class CoordinatorService {
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final notificationText =
           "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
-      final simplexMsg = "#'$_simplexGroup' $notificationText";
-      final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
-      if (result.first.stderr.isNotEmpty) {
-        print('simplex command error: ${result.first.stderr}');
+      if (_simplexChatExec!='') {
+        final simplexMsg = "#'$_simplexGroup' $notificationText";
+        final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
+        if (result.first.stderr.isNotEmpty) {
+          print('simplex command error: ${result.first.stderr}');
+        }
       }
-
       if (_matrixClient != null && _matrixClient!.isLogged()) {
         try {
           print('Sending Matrix notification to room $_matrixRoomId');

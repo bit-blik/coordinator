@@ -128,6 +128,7 @@ class Offer {
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'created_at': createdAt.toIso8601String(),
         'reserved_at': reservedAt?.toIso8601String(),
         'blik_received_at': blikReceivedAt?.toIso8601String(),
