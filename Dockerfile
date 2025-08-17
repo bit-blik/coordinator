@@ -9,8 +9,8 @@ WORKDIR /app
 # Copy the rest of the application code.
 COPY . .
 RUN apt-get update && apt-get install -y wget
-RUN wget https://github.com/simplex-chat/simplex-chat/releases/download/v6.4.0/simplex-chat-ubuntu-24_04-x86-64
-RUN mv simplex-chat-ubuntu-24_04-x86-64 /app/simplex-chat
+RUN wget https://github.com/simplex-chat/simplex-chat/releases/download/v6.4.0/simplex-chat-ubuntu-22_04-x86-64
+RUN mv simplex-chat-ubuntu-22_04-x86-64 /app/simplex-chat
 RUN chmod +x /app/simplex-chat
 
 RUN dart pub get
@@ -24,6 +24,7 @@ RUN dart compile exe bin/server.dart -o bin/server
 #FROM scratch
 FROM alpine:latest
 RUN apk add --no-cache zlib
+RUN apk add --no-cache gmp
 
 COPY --from=build /runtime/ /
 COPY --from=build /app/bin/server /app/bin/
