@@ -771,6 +771,14 @@ class CoordinatorService {
         fiatCurrency: pendingData['fiatCurrency'],
       );
       await _dbService.createOffer(offer);
+      // --- Begin: broadcast NIP-69 order event ---
+      final expirationUnix = offer.createdAt
+              .add(Duration(seconds: _fundedExpireTimeoutSeconds))
+              .millisecondsSinceEpoch ~/
+          1000;
+      await _nostrService?.broadcastNip69OrderFromOffer(offer,
+          expiration: expirationUnix);
+      // --- End: broadcast NIP-69 order event ---
       _startFundedOfferTimer(offer);
 
       // Publish status update
@@ -920,37 +928,37 @@ class CoordinatorService {
 
   // --- Other API Endpoint Logic ---
 
-  // Updated to return funded and reserved offers with status and reserved_at
-  Future<List<Map<String, dynamic>>> listAvailableOffers() async {
-    // print(
-    //     'Listing available (funded, reserved, blikReceived) offers from DB...');
-    final fundedOffers = await _dbService.getOffersByStatus(OfferStatus.funded);
-    final reservedOffers =
-        await _dbService.getOffersByStatus(OfferStatus.reserved);
-    final blikReceivedOffers =
-        await _dbService.getOffersByStatus(OfferStatus.blikReceived);
-    final allOffers = [
-      ...fundedOffers,
-      ...reservedOffers,
-      ...blikReceivedOffers
-    ];
-
-    final offerList = allOffers.map((offer) {
-      return {
-        'id': offer.id,
-        'amount_sats': offer.amountSats,
-        'maker_fees': offer.makerFees,
-        'fiat_amount': offer.fiatAmount,
-        'fiat_currency': offer.fiatCurrency,
-        'status': offer.status.name,
-        'created_at': offer.createdAt.toIso8601String(),
-        'reserved_at': offer.reservedAt?.toIso8601String(),
-        'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
-        'taker_fees': offer.takerFees,
-      };
-    }).toList();
-    return offerList;
-  }
+  // // Updated to return funded and reserved offers with status and reserved_at
+  // Future<List<Map<String, dynamic>>> listAvailableOffers() async {
+  //   // print(
+  //   //     'Listing available (funded, reserved, blikReceived) offers from DB...');
+  //   final fundedOffers = await _dbService.getOffersByStatus(OfferStatus.funded);
+  //   final reservedOffers =
+  //       await _dbService.getOffersByStatus(OfferStatus.reserved);
+  //   final blikReceivedOffers =
+  //       await _dbService.getOffersByStatus(OfferStatus.blikReceived);
+  //   final allOffers = [
+  //     ...fundedOffers,
+  //     ...reservedOffers,
+  //     ...blikReceivedOffers
+  //   ];
+  //
+  //   final offerList = allOffers.map((offer) {
+  //     return {
+  //       'id': offer.id,
+  //       'amount_sats': offer.amountSats,
+  //       'maker_fees': offer.makerFees,
+  //       'fiat_amount': offer.fiatAmount,
+  //       'fiat_currency': offer.fiatCurrency,
+  //       'status': offer.status.name,
+  //       'created_at': offer.createdAt.toIso8601String(),
+  //       'reserved_at': offer.reservedAt?.toIso8601String(),
+  //       'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
+  //       'taker_fees': offer.takerFees,
+  //     };
+  //   }).toList();
+  //   return offerList;
+  // }
 
   Future<List<Offer>> getMyActiveOffers(String userPubkey) async {
     // print('Fetching active offers for user: $userPubkey');

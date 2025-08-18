@@ -50,7 +50,7 @@ class NostrService {
           cache: MemCacheManager(),
           eventVerifier: Bip340EventVerifier(),
           bootstrapRelays: _relays,
-          logLevel: lib_logger.Level.trace),
+          logLevel: lib_logger.Level.info),
     );
 
     // Generate or load coordinator keys
@@ -300,9 +300,9 @@ class NostrService {
         case 'get_info':
           return await _coordinatorService.getCoordinatorInfo();
 
-        case 'list_offers':
-          final offers = await _coordinatorService.listAvailableOffers();
-          return {'offers': offers};
+        // case 'list_offers':
+        //   final offers = await _coordinatorService.listAvailableOffers();
+        //   return {'offers': offers};
 
         case 'initiate_offer':
           final fiatAmount = (params['fiat_amount'] as num?)?.toDouble();
@@ -624,5 +624,62 @@ class NostrService {
       await _ndk.requests.closeSubscription(_requestSubscription!.requestId);
     }
     await _ndk.destroy();
+  }
+
+  /// Broadcast a NIP-69 peer-to-peer order event based on Offer data
+  Future<void> broadcastNip69OrderFromOffer(
+    Offer offer, {
+    String orderType = 'sell',
+    String status = 'pending',
+    List<String> paymentMethods = const ['BLIK'],
+    String platform = 'Bitblik',
+    int? expiration,
+    double premium = 0,
+    String network = "mainnet",
+    String layer = "lightning",
+    String? sourceUrl = "https://bitblik.app/#/offers",
+    String? name,
+    String? geohash,
+    String? ratingJson,
+    String document = 'order',
+    String bond = "0",
+  }) async {
+    try {
+      final tags = <List<String>>[
+        ['d', offer.id],
+        ['k', orderType],
+        ['f', offer.fiatCurrency],
+        ['s', status],
+        ['amt', offer.amountSats.toString()],
+        ['fa', offer.fiatAmount.toString()],
+        ['pm', ...paymentMethods],
+        ['premium', premium.toString()],
+        if (ratingJson != null) ['rating', ratingJson],
+        if (sourceUrl != null) ['source', sourceUrl],
+        ['network', network],
+        ['layer', layer],
+        ['name', name ?? ''],
+        if (geohash != null) ['g', geohash],
+        ['bond', bond],
+        if (expiration != null) ['expiration', expiration.toString()],
+        ['y', platform],
+        ['z', document],
+      ];
+
+      final event = Nip01Event(
+        kind: 38383,
+        pubKey: _signer.getPublicKey(),
+        content: '',
+        tags: tags,
+        createdAt: offer.createdAt.millisecondsSinceEpoch ~/ 1000,
+      );
+
+      await _ndk.broadcast
+          .broadcast(nostrEvent: event, customSigner: _signer, specificRelays: _relays);
+      print(
+          'Broadcasted NIP-69 order event for offer ${offer.id}: ${event.id}');
+    } catch (e) {
+      print('Error broadcasting NIP-69 order event for offer ${offer.id}: $e');
+    }
   }
 }

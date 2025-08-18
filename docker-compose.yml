@@ -11,22 +11,31 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data # Persist data
 
-#  coordinator:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-#    container_name: coordinator
-#    extra_hosts:
-#      - "host.docker.internal:host-gateway"
-#    depends_on:
-#      - postgres
-#    environment:
-#      DATABASE_URL: postgresql://user:password@postgres:5432/bitblik_db
-#    volumes:
-#      - /root/.lnd/tls.cert:/app/tls.cert:ro
-#      - /root/.lnd/data/chain/bitcoin/mainnet/admin.macaroon:/app/admin.macaroon:ro
-#    ports:
-#      - "8686:8080"
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coordinator
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - postgres
+    environment:
+      MAKER_FEE: 0.25
+      TAKER_FEE: 0.75
+      RESERVATION_SECONDS: 30
+      SIMPLEX_GROUP: 'Bitblik-test'
+      LND_HOST: localhost
+      DB_HOST: postgres
+      DB_USER: user
+      DB_PORT: 5432
+      DB_PASSWORD: password
+      DB: bitblik_db
+    volumes:
+      - ./tls.cert:/app/tls.cert:ro
+      - ./admin.macaroon:/app/admin.macaroon:ro
+    ports:
+      - "8686:8080"
 
   client:
     build:
