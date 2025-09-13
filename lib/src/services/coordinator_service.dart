@@ -788,7 +788,7 @@ class CoordinatorService {
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final notificationText =
           "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
-      if (_simplexChatExec!='') {
+      if (_simplexChatExec != '') {
         final simplexMsg = "#'$_simplexGroup' $notificationText";
         final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
         if (result.first.stderr.isNotEmpty) {
@@ -911,18 +911,11 @@ class CoordinatorService {
       info['icon'] = _coordinatorIconUrl;
     }
 
-    // Read version from pubspec.yaml
-    try {
-      final pubspecFile = File('pubspec.yaml');
-      if (await pubspecFile.exists()) {
-        final yamlContent = await pubspecFile.readAsString();
-        final yamlMap = loadYaml(yamlContent);
-        final version = yamlMap['version'];
-        if (version != null) {
-          info['version'] = version.toString();
-        }
-      }
-    } catch (_) {}
+    // Read version from environment variable
+    const version = String.fromEnvironment('APP_VERSION');
+    if (version.isNotEmpty) {
+      info['version'] = version;
+    }
     return info;
   }
 

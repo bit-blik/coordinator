@@ -17,7 +17,8 @@ RUN dart pub get
 
 # Compile the server executable.
 # Ensure your main entrypoint is bin/server.dart
-RUN dart compile exe bin/server.dart -o bin/server
+RUN APP_VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}') && \
+    dart compile exe bin/server.dart -o bin/server --define=APP_VERSION=$APP_VERSION
 # Build minimal serving image from AOT-compiled `/server` and required system
 # libraries and configuration files stored in `/runtime/` from the build stage.
 

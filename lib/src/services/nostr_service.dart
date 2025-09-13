@@ -411,8 +411,7 @@ class NostrService {
                   now.difference(offer.takerPaidAt!.toUtc()).inHours < 24)
               .toList();
 
-          final finishedList =
-              finished.map((offer) => offer.toJson()).toList();
+          final finishedList = finished.map((offer) => offer.toJson()).toList();
           return {'offers': finishedList};
 
         case 'cancel_offer':
@@ -627,6 +626,12 @@ class NostrService {
   }
 
   /// Broadcast a NIP-69 peer-to-peer order event based on Offer data
+  // PILA also broadcast on other state changes
+  // reserved, blikReceived, blikSentToTaker = in-progress
+  // cancelled/expired = canceled
+  // takerPaid = success
+  // * reszta = ?
+
   Future<void> broadcastNip69OrderFromOffer(
     Offer offer, {
     String orderType = 'sell',
@@ -674,8 +679,8 @@ class NostrService {
         createdAt: offer.createdAt.millisecondsSinceEpoch ~/ 1000,
       );
 
-      await _ndk.broadcast
-          .broadcast(nostrEvent: event, customSigner: _signer, specificRelays: _relays);
+      await _ndk.broadcast.broadcast(
+          nostrEvent: event, customSigner: _signer, specificRelays: _relays);
       print(
           'Broadcasted NIP-69 order event for offer ${offer.id}: ${event.id}');
     } catch (e) {
