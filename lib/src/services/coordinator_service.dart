@@ -911,10 +911,22 @@ class CoordinatorService {
       info['icon'] = _coordinatorIconUrl;
     }
 
-    // Read version from environment variable
-    const version = String.fromEnvironment('APP_VERSION');
-    if (version.isNotEmpty) {
-      info['version'] = version;
+    // Read version from environment variable, with fallback to pubspec.yaml
+    const versionFromEnv = String.fromEnvironment('APP_VERSION');
+    if (versionFromEnv.isNotEmpty) {
+      info['version'] = versionFromEnv;
+    } else {
+      try {
+        final pubspecFile = File('pubspec.yaml');
+        if (await pubspecFile.exists()) {
+          final yamlContent = await pubspecFile.readAsString();
+          final yamlMap = loadYaml(yamlContent);
+          final version = yamlMap['version'];
+          if (version != null) {
+            info['version'] = version.toString();
+          }
+        }
+      } catch (_) {}
     }
     return info;
   }
