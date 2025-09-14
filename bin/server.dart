@@ -61,6 +61,15 @@ Future<void> main(List<String> args) async {
     // Set the Nostr service in the coordinator service for status updates
     coordinatorService.setNostrService(nostrService);
 
+    // Rebroadcast offers from last 24 hours if NostrService is available
+    try {
+      final offers = await dbService.getOffersFromLast24Hours();
+      print('Found ${offers.length} offers from last 24 hours to rebroadcast');
+      await nostrService.rebroadcastOffers(offers);
+    } catch (e) {
+      print('Error during rebroadcast of last 24 hours offers: $e');
+    }
+
     print('✅ Coordinator running on Nostr with relays: $relays');
     print(
         '✅ Coordinator pubkey: ${nostrService.coordinatorPubkey ?? 'Unknown'}');

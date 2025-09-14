@@ -454,6 +454,7 @@ class CoordinatorService {
             final expiredOffer = await _dbService.getOfferById(offer.id);
             if (expiredOffer != null) {
               await _publishStatusUpdate(expiredOffer);
+              await _nostrService?.broadcastNip69OrderFromOffer(expiredOffer);
             }
           } else {
             print(
@@ -884,6 +885,7 @@ class CoordinatorService {
         final expiredOffer = await _dbService.getOfferById(offer.id);
         if (expiredOffer != null) {
           await _publishStatusUpdate(expiredOffer);
+          await _nostrService?.broadcastNip69OrderFromOffer(expiredOffer);
         }
       } else {
         print(
@@ -1479,6 +1481,7 @@ class CoordinatorService {
       final cancelledOffer = await _dbService.getOfferById(offerId);
       if (cancelledOffer != null) {
         await _publishStatusUpdate(cancelledOffer);
+        await _nostrService?.broadcastNip69OrderFromOffer(cancelledOffer);
       }
 
       _invoiceSubscriptions[offer.holdInvoicePaymentHash]?.cancel();
@@ -1741,6 +1744,7 @@ class CoordinatorService {
   /// Set the Nostr service for publishing status updates
   void setNostrService(NostrService nostrService) {
     _nostrService = nostrService;
+
     print('Nostr service set for status update publishing');
   }
 
@@ -1861,4 +1865,5 @@ class CoordinatorService {
       }
     };
   }
+
 }

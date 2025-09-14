@@ -221,8 +221,8 @@ class NostrService {
       await _ndk.broadcast
           .broadcast(nostrEvent: event, specificRelays: _relays);
 
-      print(
-          'Sent encrypted status update to $recipientPubkey for offer $offerId');
+      // print(
+      //     'Sent encrypted status update to $recipientPubkey for offer $offerId');
     } catch (e) {
       print('Error sending encrypted status update to $recipientPubkey: $e');
     }
@@ -635,7 +635,6 @@ class NostrService {
   Future<void> broadcastNip69OrderFromOffer(
     Offer offer, {
     String orderType = 'sell',
-    String status = 'pending',
     List<String> paymentMethods = const ['BLIK'],
     String platform = 'Bitblik',
     int? expiration,
@@ -649,6 +648,7 @@ class NostrService {
     String document = 'order',
     String bond = "0",
   }) async {
+    final status = _mapOfferStatusToNip69Status(offer.status);
     try {
       final tags = <List<String>>[
         ['d', offer.id],
@@ -676,15 +676,75 @@ class NostrService {
         pubKey: _signer.getPublicKey(),
         content: '',
         tags: tags,
-        createdAt: offer.createdAt.millisecondsSinceEpoch ~/ 1000,
+        createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );
 
       await _ndk.broadcast.broadcast(
           nostrEvent: event, customSigner: _signer, specificRelays: _relays);
       print(
-          'Broadcasted NIP-69 order event for offer ${offer.id}: ${event.id}');
+          'Broadcasted NIP-69 order event for offer ${offer.id}, status: ${status} id:${event.id}');
     } catch (e) {
       print('Error broadcasting NIP-69 order event for offer ${offer.id}: $e');
+    }
+  }
+
+  /// Rebroadcast all offers to update their status on Nostr relays
+  Future<void> rebroadcastOffers(List<Offer> offers) async {
+    print('Starting rebroadcast of offers...');
+
+    try {
+      for (final offer in offers) {
+        final status = _mapOfferStatusToNip69Status(offer.status);
+
+        // Calculate expiration if the offer is still active
+        int? expiration;
+        if (offer.status == OfferStatus.funded) {
+          // Use the same expiration logic as in the original broadcast
+          expiration = offer.createdAt
+                  .add(Duration(seconds: 600)) // _fundedExpireTimeoutSeconds
+                  .millisecondsSinceEpoch ~/
+              1000;
+        }
+
+        await broadcastNip69OrderFromOffer(
+          offer,
+          expiration: expiration,
+        );
+
+        // Small delay between broadcasts to avoid overwhelming relays
+        await Future.delayed(Duration(milliseconds: 500));
+      }
+
+      print('Completed rebroadcasting offers');
+    } catch (e) {
+      print('Error during rebroadcast of offers: $e');
+    }
+  }
+
+  /// Map internal offer status to NIP-69 status
+  String _mapOfferStatusToNip69Status(OfferStatus status) {
+    switch (status) {
+      case OfferStatus.created:
+      case OfferStatus.funded:
+        return 'pending';
+      case OfferStatus.reserved:
+      case OfferStatus.blikReceived:
+      case OfferStatus.blikSentToMaker:
+      case OfferStatus.makerConfirmed:
+      case OfferStatus.settled:
+      case OfferStatus.payingTaker:
+      case OfferStatus.takerPaymentFailed:
+      case OfferStatus.invalidBlik:
+        return 'in-progress';
+      case OfferStatus.takerPaid:
+        return 'success';
+      case OfferStatus.cancelled:
+      case OfferStatus.expired:
+        return 'canceled';
+      case OfferStatus.conflict:
+        return 'dispute';
+      default:
+        return 'pending';
     }
   }
 }

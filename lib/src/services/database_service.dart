@@ -340,6 +340,25 @@ class DatabaseService {
     return results.map(_mapRowToOffer).toList();
   }
 
+  /// Get all offers from the last 24 hours for rebroadcasting to Nostr
+  Future<List<Offer>> getOffersFromLast24Hours() async {
+    if (_connection == null) throw StateError('Database not connected.');
+
+    final twentyFourHoursAgo = DateTime.now().toUtc().subtract(Duration(hours: 24));
+
+    final results = await _connection!.query(
+      '''
+         SELECT * FROM offers
+         WHERE created_at >= @cutoff_time
+         ORDER BY created_at DESC
+       ''',
+      substitutionValues: {
+        'cutoff_time': twentyFourHoursAgo,
+      },
+    );
+    return results.map(_mapRowToOffer).toList();
+  }
+
   Offer _mapRowToOffer(PostgreSQLResultRow row) {
     final map = row.toColumnMap();
     return Offer(
