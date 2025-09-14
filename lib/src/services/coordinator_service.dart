@@ -1017,6 +1017,7 @@ class CoordinatorService {
       final updatedOffer = await _dbService.getOfferById(offerId);
       if (updatedOffer != null) {
         await _publishStatusUpdate(updatedOffer);
+        await _nostrService?.broadcastNip69OrderFromOffer(updatedOffer);
       }
 
       return timestampToStore;
@@ -1077,6 +1078,7 @@ class CoordinatorService {
         final revertedOffer = await _dbService.getOfferById(offerId);
         if (revertedOffer != null) {
           await _publishStatusUpdate(revertedOffer);
+          await _nostrService?.broadcastNip69OrderFromOffer(revertedOffer);
         }
       }
     } else {
@@ -1427,6 +1429,7 @@ class CoordinatorService {
       final revertedOffer = await _dbService.getOfferById(offerId);
       if (revertedOffer != null) {
         await _publishStatusUpdate(revertedOffer);
+        await _nostrService?.broadcastNip69OrderFromOffer(revertedOffer);
       }
 
       return true;

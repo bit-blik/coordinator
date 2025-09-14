@@ -1,11 +1,13 @@
 - nostr
-    - listAvailableOffers should be nostr push subscription instead of poll
 
-    - multiple coordinators (from DVM/nostr announced?)
-        - list of default accepted coordinator's npubs
-        - add custom one (store in client preferences)
+    - active order in client DB should confirm status from coordinator
 
-    - make relays configurable in client/coordinator(get_info) preferences
+    - list of default accepted coordinator's npubs
+    - add custom coordinator by npub (store in client preferences)
+
+    - relays for coordinator fetched from nip-65
+        - if non existent and configured in .env broadcast nip-65 event with relay list
+
     - remove circular dependency between coordinator/nostr services !!
     - use ndk.accounts instead of single signer
         - backup/restore keys
