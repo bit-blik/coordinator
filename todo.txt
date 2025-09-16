@@ -1,8 +1,6 @@
 - nostr
 
-    - active order in client DB should confirm status from coordinator
-
-    - list of default accepted coordinator's npubs
+    - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
     - add custom coordinator by npub (store in client preferences)
 
     - relays for coordinator fetched from nip-65
@@ -10,14 +8,13 @@
 
     - remove circular dependency between coordinator/nostr services !!
     - use ndk.accounts instead of single signer
-        - backup/restore keys
-        - re-generate new keys
+
+    - offer details screen linkable by https://bitblik.app/#/offer/<id>
 
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
 
 - settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
-- transaction to dispute state
 - fidelity bond for taker
 - check leaking details on api json
 - while in /taker-conflict if maker confirms it should refresh and show taker success
