@@ -10,6 +10,9 @@
     - use ndk.accounts instead of single signer
 
     - offer details screen linkable by https://bitblik.app/#/offer/<id>
+    - fix the tests for nostr service not available
+    - retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
+
 
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
