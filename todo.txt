@@ -1,6 +1,8 @@
 - nostr
     - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
 
+    - good links to simplex & matrix groups depending on bitblik or test.bitblik
+
     - in progress offers should be listed in offer list with that in progress, timer
     - if maker confirms during conflict (made mistake) the taker conflict screen should listen to such status and show process paying screen
 
