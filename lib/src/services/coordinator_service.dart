@@ -1609,6 +1609,7 @@ class CoordinatorService {
         final paidOffer = await _dbService.getOfferById(offerId);
         if (paidOffer != null) {
           await _publishStatusUpdate(paidOffer);
+          await _nostrService?.broadcastNip69OrderFromOffer(paidOffer);
         }
 
         return null; // Success
@@ -1766,6 +1767,7 @@ class CoordinatorService {
         paymentHash: offer.holdInvoicePaymentHash,
         status: offer.status.name,
         timestamp: DateTime.now().toUtc(),
+        reservedAt: offer.reservedAt,
         makerPubkey: offer.makerPubkey,
         takerPubkey: offer.takerPubkey,
       );

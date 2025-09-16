@@ -344,7 +344,7 @@ class DatabaseService {
   Future<List<Offer>> getOffersFromLast24Hours() async {
     if (_connection == null) throw StateError('Database not connected.');
 
-    final twentyFourHoursAgo = DateTime.now().toUtc().subtract(Duration(hours: 24));
+    final twentyFourHoursAgo = DateTime.now().toUtc().subtract(Duration(hours: 1));
 
     final results = await _connection!.query(
       '''

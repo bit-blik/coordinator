@@ -152,9 +152,11 @@ class NostrService {
     required String offerId,
     required String paymentHash,
     required String status,
+
     required DateTime timestamp,
     required String makerPubkey,
     String? takerPubkey,
+    DateTime? reservedAt,
   }) async {
     try {
       // Create the status update content
@@ -162,6 +164,7 @@ class NostrService {
         'offer_id': offerId,
         'payment_hash': paymentHash,
         'status': status,
+        'reserved_at': reservedAt!=null?reservedAt.millisecondsSinceEpoch ~/ 1000:null,
         'timestamp': timestamp.millisecondsSinceEpoch ~/
             1000, // Unix timestamp in seconds
       };
