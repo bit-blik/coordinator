@@ -1204,6 +1204,19 @@ class CoordinatorService {
           'Offer $offerId is not in the conflict state (current state: ${offer.status}). Cannot mark as open dispute.');
       return false;
     }
+    try {
+      if (_paymentBackend != null) {
+        await _paymentBackend!.settleInvoice(preimageHex: offer.holdInvoicePreimage);
+        print('Hold invoice for offer $offerId settled successfully via $_paymentBackendType.');
+      } else {
+        print('CRITICAL: No payment backend to settle invoice for offer $offerId.');
+        throw Exception("No payment backend to settle invoice.");
+      }
+    } catch (e) {
+      print('Error settling hold invoice for offer $offerId: $e');
+      // ....
+      return false;
+    }
 
     final success = await _dbService.updateOfferStatus(offerId, OfferStatus.dispute);
 
