@@ -242,7 +242,10 @@ class NostrService {
       );
       _requestSubscription = response;
 
-      response.stream.listen(_handleRequest);
+      response.stream.listen(_handleRequest).onError((e) {
+        print('!!!!!!!!!!!!!! Error in request listener: $e');
+        print('!!!!!!!!!!!!!! SHOULD RETRY subscription');
+      });
 
       print(
           'Started listening for coordinator requests on kind $KIND_COORDINATOR_REQUEST');

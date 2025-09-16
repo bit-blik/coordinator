@@ -223,7 +223,7 @@ class CoordinatorService {
 
     // Initialize all configuration values
     _matrixHomeserver = _env['MATRIX_HOMESERVER'] ?? 'https://matrix.org';
-    _matrixClientName = _env['MATRIX_CLIENT_NAME'] ?? 'BitBlik Coordinator';
+    _matrixClientName = _env['MATRIX_CLIENT_NAME'] ?? 'BitBlik';
     _matrixUser = _env['MATRIX_USER'] ?? '';
     _matrixPassword = _env['MATRIX_PASSWORD'] ?? '';
     _matrixRoomId = _env['MATRIX_ROOM'] ?? '';
@@ -347,7 +347,7 @@ class CoordinatorService {
         ),
       );
 
-      await _matrixClient!.init();
+      // await _matrixClient!.init();
 
       // Check homeserver
       await _matrixClient!.checkHomeserver(Uri.parse(_matrixHomeserver));
@@ -788,6 +788,8 @@ class CoordinatorService {
       final fiatText =
           '${offer.fiatAmount.toStringAsFixed(2)} ${offer.fiatCurrency}';
       final notificationText =
+          // TODO test.bitblik.app for test version
+          // TODO link for full offer id -> opens screen with offer details and possibility of TAKE
           "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
       if (_simplexChatExec != '') {
         final simplexMsg = "#'$_simplexGroup' $notificationText";
