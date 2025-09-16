@@ -7,11 +7,13 @@
     - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
     - add custom coordinator by npub (store in client preferences)
 
+    - past/finished/history offers for given neko
+
     - relays for coordinator fetched from nip-65
         - if non existent and configured in .env broadcast nip-65 event with relay list
 
     - remove circular dependency between coordinator/nostr services !!
-    - use ndk.accounts instead of single signer
+    - use ndk.accounts instead of single signer (multiple nekos)
 
     - offer details screen linkable by https://bitblik.app/#/offer/<id>
     - fix the tests for nostr service not available
