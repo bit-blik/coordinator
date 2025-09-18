@@ -27,7 +27,8 @@ FROM alpine:latest
 RUN apk add --no-cache zlib
 RUN apk add --no-cache gmp
 
-RUN apk add --no-cache sqlite-libs
+RUN apk add --no-cache sqlite-libs libstdc++
+RUN ln -s /usr/lib/libsqlite3.so.0 /usr/lib/libsqlite3.so
 
 COPY --from=build /runtime/ /
 COPY --from=build /app/bin/server /app/bin/
