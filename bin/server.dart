@@ -26,7 +26,7 @@ Future<void> main(List<String> args) async {
   print(
       'NOSTR_PRIVATE_KEY: ${env['NOSTR_PRIVATE_KEY']?.isNotEmpty == true ? "[SET]" : "[NOT SET]"}');
   print(
-      'NOSTR_RELAYS: ${env['NOSTR_RELAYS'] ?? 'wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net,wss://offchain.pub'}');
+      'NOSTR_RELAYS: ${env['NOSTR_RELAYS'] ?? 'wss://nos.lol,wss://relay.primal.net,wss://offchain.pub'}');
   print('====================');
 
   // --- Service Initialization ---
