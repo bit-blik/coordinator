@@ -40,8 +40,6 @@ Future<void> main(List<String> args) async {
     await dbService.connect();
 
     coordinatorService = CoordinatorService(dbService);
-    await coordinatorService.init();
-
     // Initialize Nostr Service (replaces HTTP API)
     final relays = env['NOSTR_RELAYS']?.split(',') ??
         [
@@ -55,6 +53,8 @@ Future<void> main(List<String> args) async {
       coordinatorService,
       relays: relays,
     );
+    await coordinatorService.init();
+
 
     await nostrService.init(privateKey: env['NOSTR_PRIVATE_KEY'] ?? '');
 
