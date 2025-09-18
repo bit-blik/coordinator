@@ -222,6 +222,7 @@ class NostrService {
       final filter = Filter(
         kinds: [KIND_COORDINATOR_REQUEST],
         pTags: [_signer.getPublicKey()], // Events tagged with our pubkey
+        since: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );
 
       final response = _ndk.requests.subscription(
