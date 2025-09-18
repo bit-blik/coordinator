@@ -129,10 +129,10 @@ class Offer {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'created_at': createdAt.toIso8601String(),
-        'reserved_at': reservedAt?.toIso8601String(),
-        'blik_received_at': blikReceivedAt?.toIso8601String(),
-        'settled_at': settledAt?.toIso8601String(),
+        'created_at': createdAt.millisecondsSinceEpoch,
+        'reserved_at': reservedAt?.millisecondsSinceEpoch,
+        'blik_received_at': blikReceivedAt?.millisecondsSinceEpoch,
+        'settled_at': settledAt?.millisecondsSinceEpoch,
         'fiat_amount': fiatAmount,
         'fiat_currency': fiatCurrency,
         'amount_sats': amountSats,
@@ -143,7 +143,7 @@ class Offer {
         'status': status.name,
         'hold_invoice_payment_hash': holdInvoicePaymentHash,
     // 'blik_code': offer.blikCode, // Include BLIK code
-    // 'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
+    // 'taker_paid_at': offer.takerPaidAt?.millisecondsSinceEpoch,
     // 'fiat_amount': offer.fiatAmount,
     // 'fiat_currency': offer.fiatCurrency,
         'taker_fees': takerFees,

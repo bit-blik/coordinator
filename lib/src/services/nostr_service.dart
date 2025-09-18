@@ -315,7 +315,7 @@ class NostrService {
           if (reservationTimestamp != null) {
             return {
               'message': 'Offer reserved successfully',
-              'reserved_at': reservationTimestamp.toIso8601String(),
+              'reserved_at': reservationTimestamp.millisecondsSinceEpoch,
             };
           } else {
             throw Exception('Failed to reserve offer. It might be unavailable or already reserved.');
@@ -494,28 +494,6 @@ class NostrService {
       throw Exception('Error processing request: $e');
     }
   }
-
-  /// Convert offer to JSON format
-  // Map<String, dynamic> _offerToJson(dynamic offer) {
-  //   return {
-  //     'id': offer.id,
-  //     'amount_sats': offer.amountSats,
-  //     'maker_fees': offer.makerFees,
-  //     'maker_pubkey': offer.makerPubkey,
-  //     'taker_pubkey': offer.takerPubkey,
-  //     'taker_lightning_address': offer.takerLightningAddress,
-  //     'status': offer.status.name,
-  //     'created_at': offer.createdAt.toIso8601String(),
-  //     'reserved_at': offer.reservedAt?.toIso8601String(),
-  //     'blik_received_at': offer.blikReceivedAt?.toIso8601String(),
-  //     'hold_invoice_payment_hash': offer.holdInvoicePaymentHash,
-  //     'blik_code': offer.blikCode,
-  //     'taker_paid_at': offer.takerPaidAt?.toIso8601String(),
-  //     'fiat_amount': offer.fiatAmount,
-  //     'fiat_currency': offer.fiatCurrency,
-  //     'taker_fees': offer.takerFees,
-  //   };
-  // }
 
   /// Send a successful response
   Future<void> _sendResponse(String recipientPubkey, String requestId, Map<String, dynamic> result) async {
