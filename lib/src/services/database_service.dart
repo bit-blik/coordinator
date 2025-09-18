@@ -340,8 +340,8 @@ class DatabaseService {
     return results.map(_mapRowToOffer).toList();
   }
 
-  /// Get all offers from the last 24 hours for rebroadcasting to Nostr
-  Future<List<Offer>> getOffersFromLast24Hours() async {
+  /// Get all offers from the last 1 hours for rebroadcasting to Nostr
+  Future<List<Offer>> getOffersFromLastHour() async {
     if (_connection == null) throw StateError('Database not connected.');
 
     final twentyFourHoursAgo = DateTime.now().toUtc().subtract(Duration(hours: 1));

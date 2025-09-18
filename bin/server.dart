@@ -63,7 +63,7 @@ Future<void> main(List<String> args) async {
 
     // Rebroadcast offers from last 24 hours if NostrService is available
     try {
-      final offers = await dbService.getOffersFromLast24Hours();
+      final offers = await dbService.getOffersFromLastHour();
       print('Found ${offers.length} offers from last 24 hours to rebroadcast');
       await nostrService.rebroadcastOffers(offers);
     } catch (e) {
