@@ -1,26 +1,23 @@
 - nostr
-    - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
 
-    - good links to simplex & matrix groups depending on bitblik or test.bitblik
+    - CRITICAL
+        - i18n does not work ?!
+        - good links to simplex & matrix groups depending on bitblik or test.bitblik
+        - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
+        - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
 
-    - in progress offers should be listed in offer list with that in progress, timer
-    - if maker confirms during conflict (made mistake) the taker conflict screen should listen to such status and show process paying screen
-
-    - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
-    - add custom coordinator by npub (store in client preferences)
-
-    - past/finished/history offers for given neko
-
-    - relays for coordinator fetched from nip-65
-        - if non existent and configured in .env broadcast nip-65 event with relay list
-
-    - remove circular dependency between coordinator/nostr services !!
-    - use ndk.accounts instead of single signer (multiple nekos)
-
-    - offer details screen linkable by https://bitblik.app/#/offer/<id>
-    - fix the tests for nostr service not available
-    - retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
-
+    - NICE TO HAVE
+        - retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
+        - offer details screen linkable by https://bitblik.app/#/offer/<id>
+        - in progress offers should be listed in offer list with that in progress, timer
+        - if maker confirms during conflict (made mistake) the taker conflict screen should listen to such status and show process paying screen
+        - add custom coordinator by npub (store in client preferences)
+        - past/finished/history offers for given neko
+        - relays for coordinator fetched from nip-65
+            - if non existent and configured in .env broadcast nip-65 event with relay list
+        - remove circular dependency between coordinator/nostr services !!
+        - use ndk.accounts instead of single signer (multiple nekos)
+        - fix the tests for nostr service not available
 
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch

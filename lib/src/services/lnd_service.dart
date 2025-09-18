@@ -135,6 +135,7 @@ class LndService implements PaymentService {
       ..cltvExpiry = Int64(80)
       ..hash = paymentHashBytes
       ..value = Int64(amountSats)
+      ..private = true
       ..expiry = Int64(86400); // 24 hours expiration
     print('LND: Creating hold invoice for hash: $paymentHashHex');
     final response = await _invoicesClient!.addHoldInvoice(request);
