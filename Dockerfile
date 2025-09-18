@@ -27,6 +27,8 @@ FROM alpine:latest
 RUN apk add --no-cache zlib
 RUN apk add --no-cache gmp
 
+RUN apk add --no-cache sqlite-libs
+
 COPY --from=build /runtime/ /
 COPY --from=build /app/bin/server /app/bin/
 COPY --from=build /app/simplex-chat /app/
