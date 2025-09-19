@@ -8,6 +8,7 @@
         - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
 
     - NICE TO HAVE
+        - timer 120s on /confirm-blik and after inform of 48h (?) it will automatically be settled in taker's favor
         - retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
         - in progress offers should be listed in offer list with that in progress, timer
         - if maker confirms during conflict (made mistake) the taker conflict screen should listen to such status and show process paying screen
