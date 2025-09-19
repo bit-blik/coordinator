@@ -1,7 +1,6 @@
 - nostr
 
     - CRITICAL
-        - i18n does not work ?!
         - offer details screen linkable by https://bitblik.app/#/offer/<id>
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
