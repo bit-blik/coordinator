@@ -2,13 +2,13 @@
 
     - CRITICAL
         - i18n does not work ?!
+        - offer details screen linkable by https://bitblik.app/#/offer/<id>
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
         - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
 
     - NICE TO HAVE
         - retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
-        - offer details screen linkable by https://bitblik.app/#/offer/<id>
         - in progress offers should be listed in offer list with that in progress, timer
         - if maker confirms during conflict (made mistake) the taker conflict screen should listen to such status and show process paying screen
         - add custom coordinator by npub (store in client preferences)
