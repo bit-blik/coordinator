@@ -199,6 +199,7 @@ class CoordinatorService {
 
   late final _simplexGroup;
   late final _simplexChatExec;
+  late final frontendDomain;
 
   CoordinatorService(this._dbService,
       {PaymentService? paymentServiceForTest, Clock? clock, http.Client? httpClient, NostrService? nostrService})
@@ -214,6 +215,8 @@ class CoordinatorService {
     _matrixUser = _env['MATRIX_USER'] ?? '';
     _matrixPassword = _env['MATRIX_PASSWORD'] ?? '';
     _matrixRoomId = _env['MATRIX_ROOM'] ?? '';
+
+    frontendDomain = _env['FRONTEND_DOMAIN'] ?? 'https://bitblik.app';
 
     _simplexGroup = _env['SIMPLEX_GROUP'] ?? 'Bitblik new offers';
     _simplexChatExec = _env['SIMPLEX_CHAT_EXEC'] ?? './simplex-chat';
@@ -718,7 +721,7 @@ class CoordinatorService {
       final notificationText =
           // TODO test.bitblik.app for test version
           // TODO link for full offer id -> opens screen with offer details and possibility of TAKE
-          "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://bitblik.app/#/offers";
+          "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://${frontendDomain}/offer/${offer.id}";
       if (_simplexChatExec != '') {
         final simplexMsg = "#'$_simplexGroup' $notificationText";
         final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
