@@ -613,7 +613,7 @@ class NostrService {
         ['pm', ...paymentMethods],
         ['premium', premium.toString()],
         if (ratingJson != null) ['rating', ratingJson],
-        ['source', "https://${_coordinatorService.frontendDomain}/offer/${offer.id}",],
+        ['source', "https://${_coordinatorService.frontendDomain}/offers/${offer.id}",],
         ['network', network],
         ['layer', layer],
         ['name', name ?? ''],

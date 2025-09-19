@@ -216,7 +216,7 @@ class CoordinatorService {
     _matrixPassword = _env['MATRIX_PASSWORD'] ?? '';
     _matrixRoomId = _env['MATRIX_ROOM'] ?? '';
 
-    frontendDomain = _env['FRONTEND_DOMAIN'] ?? 'https://bitblik.app';
+    frontendDomain = _env['FRONTEND_DOMAIN'] ?? 'bitblik.app';
 
     _simplexGroup = _env['SIMPLEX_GROUP'] ?? 'Bitblik new offers';
     _simplexChatExec = _env['SIMPLEX_CHAT_EXEC'] ?? './simplex-chat';
@@ -721,7 +721,7 @@ class CoordinatorService {
       final notificationText =
           // TODO test.bitblik.app for test version
           // TODO link for full offer id -> opens screen with offer details and possibility of TAKE
-          "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://${frontendDomain}/offer/${offer.id}";
+          "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://${frontendDomain}/offers/${offer.id}";
       if (_simplexChatExec != '') {
         final simplexMsg = "#'$_simplexGroup' $notificationText";
         final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
