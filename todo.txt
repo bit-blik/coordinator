@@ -3,15 +3,16 @@
     - CRITICAL
         - on reconnect relay (from background) should ensure subscription for offer status change + responses + ...??
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
-        - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
         - re-run tests for coordinator state changes!
-        - remove or fix recent transactions (avg 7d)
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
 
     - NICE TO HAVE
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
         - coordinator name and avatar from metadata kind-0
-        - whitelist coordinators from bitblik followed list
+        - whitelist coordinators:
+            - from bitblik followed list
+            - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
+
         - timer 120s on /confirm-blik and after inform of 48h (?) it will automatically be settled in taker's favor
         - retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
         - in progress offers should be listed in offer list with that in progress, timer
