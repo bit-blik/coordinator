@@ -27,7 +27,7 @@ import 'nostr_service.dart';
 const Duration _kDebugDelayDuration = Duration(seconds: 0);
 
 class CoordinatorService {
-  final DatabaseService _dbService;
+  final Databvice _dbService;
   PaymentService? _paymentBackend; // Unified payment backend
   String _paymentBackendType = "none"; // To track active backend: "lnd", "nwc", or "none"
   final Clock _clock; // Added for testable time
@@ -1650,6 +1650,7 @@ class CoordinatorService {
 
     // Iterate over all successful offers for stats calculation
     for (final offer in allSuccessfulOffers) {
+      offer.holdInvoicePaymentHash = null;
       // Add to offersJsonLast7Days only if created in the last 7 days
       if (offer.createdAt.isAfter(sevenDaysAgo)) {
         offersJsonLast7Days.add(offer.toJson());
