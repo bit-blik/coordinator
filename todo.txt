@@ -7,6 +7,7 @@
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
         - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
+        - re-run tests for coordinator state changes!
 
     - NICE TO HAVE
         - re-subscribe when app comes back from background!
