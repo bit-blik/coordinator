@@ -8,7 +8,11 @@
 
     - NICE TO HAVE
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
-        - coordinator name and avatar from metadata kind-0
+        - coordinator metadata kind-0
+            - name
+            - avatar picture
+            - relays (nip-65)
+        - coordinator discovery on bootstrap many relays (purplepag.es)
         - whitelist coordinators:
             - from bitblik followed list
             - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
