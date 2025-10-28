@@ -24,6 +24,7 @@
         - remove circular dependency between coordinator/nostr services !!
         - use ndk.accounts instead of single signer (multiple nekos)
         - fix the tests for nostr service not available
+        - public stats / coordinator info should not require client pubkey (rpc signing request)
 
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
