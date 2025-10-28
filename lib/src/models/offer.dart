@@ -143,7 +143,7 @@ class Offer {
         'status': status.name,
         'hold_invoice_payment_hash': holdInvoicePaymentHash,
     // 'blik_code': offer.blikCode, // Include BLIK code
-    // 'taker_paid_at': offer.takerPaidAt?.millisecondsSinceEpoch,
+        'taker_paid_at': takerPaidAt?.millisecondsSinceEpoch,
     // 'fiat_amount': offer.fiatAmount,
     // 'fiat_currency': offer.fiatCurrency,
         'taker_fees': takerFees,
