@@ -5,6 +5,7 @@
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
         - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
         - re-run tests for coordinator state changes!
+        - remove or fix recent transactions (avg 7d)
 
     - NICE TO HAVE
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
