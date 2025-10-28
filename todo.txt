@@ -6,6 +6,7 @@
         - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
         - re-run tests for coordinator state changes!
         - remove or fix recent transactions (avg 7d)
+        - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
 
     - NICE TO HAVE
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
