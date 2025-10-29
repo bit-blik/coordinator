@@ -6,6 +6,7 @@
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
         - re-run tests for coordinator state changes!
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
+        - [ ] accept terms of service per coordinator
 
     - NICE TO HAVE
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
