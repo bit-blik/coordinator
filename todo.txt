@@ -2,10 +2,9 @@
 
     - CRITICAL
         - on reconnect relay (from background) should ensure subscription for offer status change + responses + ...??
+            -  didChangeAppLifecycleState -> await ndk.connectivity.tryReconnect();
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
         - re-run tests for coordinator state changes!
-        - after generating new neko, cannot create invoice for paying
-        - _ndk field already initialized
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
 
     - NICE TO HAVE
