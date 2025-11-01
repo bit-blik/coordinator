@@ -19,3 +19,5 @@ tls.cert
 admin.macaroon
 /.env
 /bin/server.exe
+/docker-compose.yml
+/signal/

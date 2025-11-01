@@ -28,7 +28,7 @@ class Offer {
   final int amountSats;
   final int makerFees; // Renamed from feeSats
   final String makerPubkey;
-  final String holdInvoicePaymentHash;
+  String holdInvoicePaymentHash;
   final String holdInvoicePreimage; // Store preimage for settling
   OfferStatus status;
   DateTime createdAt;

@@ -7,6 +7,8 @@
         - re-run tests for coordinator state changes!
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
         - [ ] accept terms of service per coordinator
+        - offer details screen should subscribe to offer status change and update status in UI
+          - and show timers
 
     - NICE TO HAVE
         - good links to simplex & matrix groups depending on bitblik or test.bitblik

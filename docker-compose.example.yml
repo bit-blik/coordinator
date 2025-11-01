@@ -20,20 +20,11 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - postgres
-    environment:
-      MAKER_FEE: 0.25
-      TAKER_FEE: 0.75
-      RESERVATION_SECONDS: 30
-      SIMPLEX_GROUP: 'Bitblik-test'
-      LND_HOST: localhost
-      DB_HOST: postgres
-      DB_USER: user
-      DB_PORT: 5432
-      DB_PASSWORD: password
-      DB: bitblik_db
     volumes:
       - ./tls.cert:/app/tls.cert:ro
       - ./admin.macaroon:/app/admin.macaroon:ro
+      - ./.env:/app/.env
+      - ./signal/:/root/.local/share/signal-cli/
     ports:
       - "8686:8080"
 
