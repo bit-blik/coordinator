@@ -49,6 +49,7 @@ class CoordinatorService {
   // Coordinator Info
   late final String _coordinatorName;
   late final String _coordinatorIconUrl;
+  late final String _termsOfUsageNaddr;
 
   // Offer amount limits
   late final int _minAmountSats;
@@ -244,6 +245,13 @@ class CoordinatorService {
     _coordinatorName = _env['NAME'] ?? 'BitBlik Coordinator';
     _coordinatorIconUrl =
         _env['ICON_URL'] ?? 'https://bitblik.app/splash/img/dark-2x.png';
+
+    // Terms of usage is required from environment variable
+    final termsOfUsageEnv = _env['TERMS_OF_USAGE_NADDR'];
+    if (termsOfUsageEnv == null || termsOfUsageEnv.isEmpty) {
+      throw Exception('TERMS_OF_USAGE_NADDR environment variable is required');
+    }
+    _termsOfUsageNaddr = termsOfUsageEnv;
 
     _minAmountSats = int.tryParse(_env['MIN_AMOUNT_SATS'] ?? '') ?? 1000;
     _maxAmountSats = int.tryParse(_env['MAX_AMOUNT_SATS'] ?? '') ?? 250000;
@@ -966,6 +974,7 @@ class CoordinatorService {
       'min_amount_sats': _minAmountSats,
       'max_amount_sats': _maxAmountSats,
       'currencies': _supportedCurrencies,
+      'terms_of_usage_naddr': _termsOfUsageNaddr,
     };
 
     if (_coordinatorIconUrl.isNotEmpty) {
