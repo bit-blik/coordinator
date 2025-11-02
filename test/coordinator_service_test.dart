@@ -1,21 +1,23 @@
+import 'dart:async';
+import 'dart:convert'; // For jsonEncode
+
+import 'package:bitblik_coordinator/src/models/create_hold_invoice_result.dart'; // Added
+import 'package:bitblik_coordinator/src/models/invoice_details.dart'; // Added for InvoiceDetails
+import 'package:bitblik_coordinator/src/models/invoice_status.dart';
+import 'package:bitblik_coordinator/src/models/invoice_update.dart';
+import 'package:bitblik_coordinator/src/models/offer.dart'; // Assuming Offer and OfferStatus are here
+import 'package:bitblik_coordinator/src/models/pay_invoice_result.dart'; // Added
 import 'package:bitblik_coordinator/src/services/coordinator_service.dart';
 import 'package:bitblik_coordinator/src/services/database_service.dart';
 import 'package:bitblik_coordinator/src/services/payment_service.dart';
-import 'package:bitblik_coordinator/src/models/create_hold_invoice_result.dart'; // Added
-import 'package:bitblik_coordinator/src/models/pay_invoice_result.dart'; // Added
-import 'package:bitblik_coordinator/src/models/offer.dart'; // Assuming Offer and OfferStatus are here
-import 'package:bitblik_coordinator/src/models/invoice_status.dart';
-import 'package:bitblik_coordinator/src/models/invoice_update.dart';
-import 'package:bitblik_coordinator/src/models/invoice_details.dart'; // Added for InvoiceDetails
-import 'package:test/test.dart';
-import 'package:mockito/mockito.dart';
-import 'package:mockito/annotations.dart';
-import 'package:http/http.dart' as http;
 // For MockClient if not using Mockito's for http
 import 'package:clock/clock.dart';
-import 'dart:convert'; // For jsonEncode
 import 'package:fake_async/fake_async.dart';
-import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'package:mockito/annotations.dart';
+import 'package:mockito/mockito.dart';
+import 'package:test/test.dart';
+
 // Added for Uuid().v4()
 // Added for Matcher, Description
 

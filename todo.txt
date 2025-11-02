@@ -1,16 +1,19 @@
 - nostr
 
     - CRITICAL
-        - on reconnect relay (from background) should ensure subscription for offer status change + responses + ...??
-            -  didChangeAppLifecycleState -> await ndk.connectivity.tryReconnect();
         - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
-        - re-run tests for coordinator state changes!
-        - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
         - [ ] accept terms of service per coordinator
-        - offer details screen should subscribe to offer status change and update status in UI
-          - and show timers
+        - if a client took and reserved an offer but then canceled reservation, and then another client took it, I have resume!!!
+
+    RELEASE:
+        - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
+        - FRONTEND_DOMAIN: test.bitblik.app
 
     - NICE TO HAVE
+
+        - offer details screen should subscribe to offer status change and update status in UI
+          - and show timers (reserved time left, blik code validity time left)
+          - this is needed when it's not a get_my_active_offer, since status updates it's only for active per key
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
         - coordinator metadata kind-0
             - name
@@ -50,7 +53,6 @@
 
 - sound effects when status changes
 - local notifications when status changes
-- telegram bot
 
 ======
 - dark theme
