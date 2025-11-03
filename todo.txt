@@ -1,11 +1,5 @@
 - nostr
 
-    - CRITICAL
-        - on invalidBlik and cancel by taker we should cancel the reservation and go back to funded
-        - [ ] accept terms of service per coordinator
-        - if a client took and reserved an offer but then canceled reservation, and then another client took it, I have resume!!!
-        - offer in state conflict will appear in the list with "enter blik" button action!!!
-
     RELEASE:
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
         - FRONTEND_DOMAIN: test.bitblik.app
@@ -16,6 +10,8 @@
           - and show timers (reserved time left, blik code validity time left)
           - this is needed when it's not a get_my_active_offer, since status updates it's only for active per key
         - good links to simplex & matrix groups depending on bitblik or test.bitblik
+        - on invalidBlik status, it should be possible to cancel which would also cancel the reservation and go back to funded
+            - needs support code in coordinator workflow
         - coordinator metadata kind-0
             - name
             - avatar picture
@@ -43,7 +39,6 @@
 
 - settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 - fidelity bond for taker
-- check leaking details on api json
 - while in /taker-conflict if maker confirms it should refresh and show taker success
 
 - better details on MakerSuccessScreen
