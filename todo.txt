@@ -39,6 +39,7 @@
         - fix the tests for nostr service not available
         - public stats / coordinator info should not require client pubkey (rpc signing request)
 
+- premium % above market price for maker
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
 
