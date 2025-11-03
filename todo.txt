@@ -1,5 +1,10 @@
 - nostr
 
+    CRITICAL:
+     - logo
+     - terms of usage
+     - info + checkbox risk of refund BLIK acceptance
+
     RELEASE:
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
         - FRONTEND_DOMAIN: test.bitblik.app
