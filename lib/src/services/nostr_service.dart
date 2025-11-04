@@ -700,6 +700,7 @@ class NostrService {
       for (final offer in offers) {
         // final status = _mapOfferStatusToNip69Status(offer.status);
 
+        print('Rebroadcasting offer ${offer.id} with status ${offer.status.name}');
         // Calculate expiration if the offer is still active
         int? expiration;
         if (offer.status == OfferStatus.funded) {
@@ -746,6 +747,7 @@ class NostrService {
       case OfferStatus.expired:
         return 'canceled';
       case OfferStatus.conflict:
+      case OfferStatus.dispute:
         return 'dispute';
       default:
         return 'pending';
