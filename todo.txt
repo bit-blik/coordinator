@@ -4,6 +4,7 @@
      - logo
      - terms of usage
      - info + checkbox risk of refund BLIK acceptance
+     - broadcast nip69 event when dispute/conflict
 
     RELEASE:
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
