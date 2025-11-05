@@ -3,11 +3,9 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:bip340/bip340.dart' as bip340;
-import 'package:logger/logger.dart' as lib_logger;
 import 'package:ndk/ndk.dart';
 import 'package:ndk/shared/nips/nip19/nip19.dart';
 import 'package:ndk/shared/nips/nip44/nip44.dart';
-import 'package:ndk_rust_verifier/data_layer/repositories/verifiers/rust_event_verifier.dart';
 
 import 'coordinator_service.dart';
 import '../models/offer.dart';
@@ -49,7 +47,7 @@ class NostrService {
     _ndk = Ndk(
       NdkConfig(
           cache: MemCacheManager(),
-          eventVerifier: RustEventVerifier(),
+          eventVerifier: Bip340EventVerifier(),//RustEventVerifier(),
           bootstrapRelays: _relays,
           logLevel: LogLevel.info),
     );
