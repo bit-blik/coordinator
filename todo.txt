@@ -1,16 +1,15 @@
 - nostr
 
     CRITICAL:
-     - logo
-     - terms of usage
-     - info + checkbox risk of refund BLIK acceptance
-     - broadcast nip69 event when dispute/conflict
+     - use test groups for signal/telegram
 
     RELEASE:
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
         - FRONTEND_DOMAIN: test.bitblik.app
 
     - NICE TO HAVE
+        - info + checkbox risk of refund BLIK acceptance
+        - review terms of usage
         - should confirm offer data from coordinator and not only rely on nostr KIND_OFFER event, for offer list and details
         - offer details screen should subscribe to offer status change and update status in UI
           - and show timers (reserved time left, blik code validity time left)
