@@ -1339,6 +1339,7 @@ class CoordinatorService {
       final updatedOffer = await _dbService.getOfferById(offerId);
       if (updatedOffer != null) {
         await _publishStatusUpdate(updatedOffer);
+        await _nostrService?.broadcastNip69OrderFromOffer(updatedOffer);
       }
     } else {
       print('Failed to update offer $offerId status to conflict in DB.');
@@ -1388,6 +1389,7 @@ class CoordinatorService {
       final updatedOffer = await _dbService.getOfferById(offerId);
       if (updatedOffer != null) {
         await _publishStatusUpdate(updatedOffer);
+        await _nostrService?.broadcastNip69OrderFromOffer(updatedOffer);
       }
     } else {
       print('Failed to update offer $offerId status to dispute in DB.');
