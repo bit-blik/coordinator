@@ -1,12 +1,37 @@
 - nostr
 
-        - send notifications in parallell
-
     RELEASE:
-        - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
-        - FRONTEND_DOMAIN: test.bitblik.app
+        - fix matrix login!
+        - change everywhere new logo
+            - simplex group
+            - matrix element group
+        - zapstore publish
+        - github release
+        - deploy client web on bitblik.app
 
-    - NICE TO HAVE
+CRASH!!!!!!!!!!!!!!!!!!!!
+test-coordinator  | Unhandled exception:
+test-coordinator  | Bad state: Cannot add event after closing
+test-coordinator  | #0      _StreamController.add (dart:async/stream_controller.dart:617)
+test-coordinator  | #1      RelayManager._handleIncomingMessage (package:ndk/domain_layer/usecases/relay_manager.dart:400)
+test-coordinator  | #2      RelayManager._startListeningToSocket.<anonymous closure> (package:ndk/domain_layer/usecases/relay_manager.dart:358
+)
+test-coordinator  | #3      _RootZone.runUnaryGuarded (dart:async/zone.dart:1778)
+test-coordinator  | #4      _BufferingStreamSubscription._sendData (dart:async/stream_impl.dart:381)
+test-coordinator  | #5      _DelayedData.perform (dart:async/stream_impl.dart:573)
+test-coordinator  | #6      _PendingEvents.handleNext (dart:async/stream_impl.dart:678)
+test-coordinator  | #7      _PendingEvents.schedule.<anonymous closure> (dart:async/stream_impl.dart:649)
+test-coordinator  | #8      _microtaskLoop (dart:async/schedule_microtask.dart:40)
+test-coordinator  | #9      _startMicrotaskLoop (dart:async/schedule_microtask.dart:49)
+test-coordinator  | #10     _runPendingImmediateCallback (dart:isolate-patch/isolate_patch.dart:127)
+test-coordinator  | #11     _Timer._runTimers (dart:isolate-patch/timer_impl.dart:430)
+test-coordinator  | #12     _Timer._handleMessage (dart:isolate-patch/timer_impl.dart:454)
+test-coordinator  | #13     _RawReceivePort._handleMessage (dart:isolate-patch/isolate_patch.dart:193)
+test-coordinator exited with code 255 (restarting)
+
+
+    - NEXT
+        - expired offer is as active but cannot do anything with it (cannot resume offer in state...)
         - offers from custom coordinators should still show coordinator info on offer details screen
         - review terms of usage
         - info + checkbox risk of refund BLIK acceptance
@@ -38,9 +63,13 @@
         - fix the tests for nostr service not available
         - public stats / coordinator info should not require client pubkey (rpc signing request)
 
+- list of finished offers in menu
+- rate coordinators on nostr (find which NIP for ratings)
 - premium % above market price for maker
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
+
+- reputation mode (maybe using nostr profiles and WoT?)
 
 - settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 - fidelity bond for taker
