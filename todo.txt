@@ -1,20 +1,19 @@
 - nostr
 
-    CRITICAL:
-     - use test groups for signal/telegram
+        - send notifications in parallell
 
     RELEASE:
         - adjust  <data android:scheme="https" android:host="test.bitblik.app" android:pathPrefix="/" /> to bitblik.app
         - FRONTEND_DOMAIN: test.bitblik.app
 
     - NICE TO HAVE
-        - info + checkbox risk of refund BLIK acceptance
+        - offers from custom coordinators should still show coordinator info on offer details screen
         - review terms of usage
+        - info + checkbox risk of refund BLIK acceptance
         - should confirm offer data from coordinator and not only rely on nostr KIND_OFFER event, for offer list and details
         - offer details screen should subscribe to offer status change and update status in UI
           - and show timers (reserved time left, blik code validity time left)
           - this is needed when it's not a get_my_active_offer, since status updates it's only for active per key
-        - good links to simplex & matrix groups depending on bitblik or test.bitblik
         - on invalidBlik status, it should be possible to cancel which would also cancel the reservation and go back to funded
             - needs support code in coordinator workflow
         - coordinator metadata kind-0

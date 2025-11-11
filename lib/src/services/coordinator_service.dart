@@ -826,64 +826,92 @@ class CoordinatorService {
           // TODO test.bitblik.app for test version
           // TODO link for full offer id -> opens screen with offer details and possibility of TAKE
           "New offer/Nowa oferta: ${offer.amountSats} sats (${fiatText}) -> https://${frontendDomain}/offers/${offer.id}";
+
+      // Send all notifications in parallel
+      final List<Future<void>> notificationFutures = [];
+
+      // SimpleX notification
       if (_simplexChatExec != '') {
-        try {
-          final simplexMsg = "#'$_simplexGroup' $notificationText";
-          final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
-          if (result.first.stderr.isNotEmpty) {
-            print('simplex command error: ${result.first.stderr}');
-          }
-        } catch (e) {
-          print('Error sending SimpleX notification: $e');
-        }
+        notificationFutures.add(_sendSimpleXNotification(notificationText));
       }
+
+      // Matrix notification
       if (_matrixClient != null && _matrixClient!.isLogged()) {
-        try {
-          print('Sending Matrix notification to room $_matrixRoomId');
-          final room = _matrixClient!.getRoomById(_matrixRoomId);
-          if (room == null) {
-            print('Error: Could not find Matrix room $_matrixRoomId');
-          } else {
-            await room.sendTextEvent(notificationText);
-            print('Matrix notification sent successfully.');
-          }
-        } catch (e) {
-          print('Error sending Matrix notification: $e');
-        }
-      } else {
-        print(
-            'Matrix client not initialized or not logged in. Skipping notification.');
+        notificationFutures.add(_sendMatrixNotification(notificationText));
       }
+
+      // Telegram notification
       if (_telegramService != null && _telegramService!.isConfigured) {
-        try {
-          await _telegramService!.sendMessage(notificationText);
-        } catch (e) {
-          print('Error sending Telegram notification: $e');
-        }
-      } else {
-        print('Telegram service not configured. Skipping notification.');
+        notificationFutures.add(_sendTelegramNotification(notificationText));
       }
+
+      // Signal notification
       if (_signalCliExec != '' && _signalGroupId.isNotEmpty) {
-        try {
-          final signalCmd =
-              '$_signalCliExec send -g $_signalGroupId -m "$notificationText"';
-          final result = await run(signalCmd);
-          if (result.first.stderr.isNotEmpty) {
-            print('signal-cli command error: ${result.first.stderr}');
-          } else {
-            print('Signal notification sent successfully.');
-          }
-        } catch (e) {
-          print('Error sending Signal notification: $e');
-        }
-      } else {
-        print(
-            'Signal not configured: SIGNAL_CLI_EXEC or SIGNAL_GROUP_ID not set. Skipping notification.');
+        notificationFutures.add(_sendSignalNotification(notificationText));
+      }
+
+      // Execute all notifications in parallel
+      if (notificationFutures.isNotEmpty) {
+        await Future.wait(notificationFutures, eagerError: false);
       }
 
       print('Offer ${offer.id} created successfully in DB.');
     } catch (e) {
       print('Error creating offer in DB for $paymentHashHex: $e');
+    }
+  }
+
+  /// Send SimpleX notification (returns Future for parallel execution)
+  Future<void> _sendSimpleXNotification(String notificationText) async {
+    try {
+      final simplexMsg = "#'$_simplexGroup' $notificationText";
+      final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
+      if (result.first.stderr.isNotEmpty) {
+        print('simplex command error: ${result.first.stderr}');
+      }
+    } catch (e) {
+      print('Error sending SimpleX notification: $e');
+    }
+  }
+
+  /// Send Matrix notification (returns Future for parallel execution)
+  Future<void> _sendMatrixNotification(String notificationText) async {
+    try {
+      print('Sending Matrix notification to room $_matrixRoomId');
+      final room = _matrixClient!.getRoomById(_matrixRoomId);
+      if (room == null) {
+        print('Error: Could not find Matrix room $_matrixRoomId');
+      } else {
+        await room.sendTextEvent(notificationText);
+        print('Matrix notification sent successfully.');
+      }
+    } catch (e) {
+      print('Error sending Matrix notification: $e');
+    }
+  }
+
+  /// Send Telegram notification (returns Future for parallel execution)
+  Future<void> _sendTelegramNotification(String notificationText) async {
+    try {
+      await _telegramService!.sendMessage(notificationText);
+    } catch (e) {
+      print('Error sending Telegram notification: $e');
+    }
+  }
+
+  /// Send Signal notification (returns Future for parallel execution)
+  Future<void> _sendSignalNotification(String notificationText) async {
+    try {
+      final signalCmd =
+          '$_signalCliExec send -g $_signalGroupId -m "$notificationText"';
+      final result = await run(signalCmd);
+      if (result.first.stderr.isNotEmpty) {
+        print('signal-cli command error: ${result.first.stderr}');
+      } else {
+        print('Signal notification sent successfully.');
+      }
+    } catch (e) {
+      print('Error sending Signal notification: $e');
     }
   }
 
