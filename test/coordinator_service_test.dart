@@ -1122,7 +1122,7 @@ void main() {
       });
     });
 
-    test('blkReceived reverts to funded after BLIK confirmation timeout (120s)', () {
+    test('blkReceived reverts to expiredBlik after BLIK confirmation timeout (120s)', () {
       fakeAsync((async) {
         final offerIdForBlikTimeout = 'blik-timeout-offer-id';
         final initialTime = clock.now().toUtc();
@@ -1153,9 +1153,9 @@ void main() {
         });
         
         // Mock the update back to funded status for timeout
-        when(mockDbService.updateOfferStatus(offerIdForBlikTimeout, OfferStatus.funded))
+        when(mockDbService.updateOfferStatus(offerIdForBlikTimeout, OfferStatus.expiredBlik))
             .thenAnswer((_) async {
-          blikReceivedOffer.status = OfferStatus.funded; // Simulate DB update
+          blikReceivedOffer.status = OfferStatus.expiredBlik; // Simulate DB update
           return true;
         });
 
@@ -1190,12 +1190,12 @@ void main() {
         final blikConfirmationTimeout = Duration(seconds: 120); // As per CoordinatorService._startBlikConfirmationTimer
         async.elapse(blikConfirmationTimeout - Duration(seconds: 1));
         
-        verifyNever(mockDbService.updateOfferStatus(offerIdForBlikTimeout, OfferStatus.funded));
+        verifyNever(mockDbService.updateOfferStatus(offerIdForBlikTimeout, OfferStatus.expiredBlik));
         
         // 4. Elapse time past the BLIK confirmation timeout
         async.elapse(Duration(seconds: 2));
 
-        verify(mockDbService.updateOfferStatus(offerIdForBlikTimeout, OfferStatus.funded)).called(1);
+        verify(mockDbService.updateOfferStatus(offerIdForBlikTimeout, OfferStatus.expiredBlik)).called(1);
       });
     });
 
