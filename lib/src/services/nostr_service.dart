@@ -687,7 +687,7 @@ class NostrService {
         pubKey: _signer.getPublicKey(),
         content: '',
         tags: tags,
-        createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        createdAt: offer.createdAt.millisecondsSinceEpoch ~/ 1000,
       );
 
       await _ndk.broadcast.broadcast(
