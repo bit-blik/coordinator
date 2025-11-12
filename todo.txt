@@ -52,13 +52,17 @@
         - fix the tests for nostr service not available
         - public stats / coordinator info should not require client pubkey (rpc signing request)
 
-- list of finished offers in menu
+- list of current/finished offers in menu
 - rate coordinators on nostr (find which NIP for ratings)
 - premium % above market price for maker
 - NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
 
 - reputation mode (maybe using nostr profiles and WoT?)
+
+- notifications
+    - by nostr
+    - by foreground service
 
 - settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 - fidelity bond for taker
