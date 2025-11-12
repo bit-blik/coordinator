@@ -672,6 +672,14 @@ class NostrService {
         if (expiration != null) ['expiration', expiration.toString()],
         ['y', platform],
         ['z', document],
+        ['reserved_at',
+            offer.reservedAt != null
+                ? (offer.reservedAt!.millisecondsSinceEpoch ~/ 1000).toString()
+                : ''],
+        ['paid_at',
+            offer.takerPaidAt != null
+                ? (offer.takerPaidAt!.millisecondsSinceEpoch ~/ 1000).toString()
+                : ''],
       ];
 
       final event = Nip01Event(
