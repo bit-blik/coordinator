@@ -1170,11 +1170,14 @@ class CoordinatorService {
     if (offer != null &&
         (offer.status == OfferStatus.blikReceived ||
             offer.status == OfferStatus.blikSentToMaker)) {
+      final newStatus = offer.status == OfferStatus.blikReceived
+          ? OfferStatus.expiredBlik
+          : OfferStatus.expiredSentBlik;
       print(
-          'Offer ${offer.id} BLIK confirmation timed out (status: ${offer.status}). Reverting status to funded.');
+          'Offer ${offer.id} BLIK confirmation timed out (status: ${offer.status}). Transitioning to $newStatus');
       final success = await _dbService.updateOfferStatus(
         offerId,
-        OfferStatus.funded,
+        newStatus,
         // Clear BLIK related fields as well
         blikCode: null,
         takerLightningAddress: null,
@@ -1182,7 +1185,7 @@ class CoordinatorService {
       );
       if (success) {
         print(
-            'Offer $offerId status reverted to funded due to BLIK confirmation timeout.');
+            'Offer $offerId status reverted to $newStatus to BLIK confirmation timeout.');
 
         // Publish status update
         final revertedOffer = await _dbService.getOfferById(offerId);
@@ -1190,8 +1193,8 @@ class CoordinatorService {
           await _publishStatusUpdate(revertedOffer);
         }
 
-        // Restart the funded offer timer
-        _startFundedOfferTimer(offer);
+        // TODO start 60min timer to settle the invoice
+        //_startFundedOfferTimer(offer);
       } else {
         print(
             'Error reverting offer $offerId status after BLIK confirmation timeout.');

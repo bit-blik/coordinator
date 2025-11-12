@@ -9,7 +9,9 @@ enum OfferStatus {
 
   reserved, // Taker has expressed interest, 15s timer started
   blikReceived, // Taker submitted BLIK, 120s timer started
+  expiredBlik, // BLIK not confirmed in time
   blikSentToMaker, // Maker requested BLIK code
+  expiredSentBlik, // Maker did not confirm BLIK in time
 
   invalidBlik, // Maker marked the BLIK code as invalid
   conflict, // Taker reported conflict after Maker marked BLIK as invalid
