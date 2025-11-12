@@ -676,6 +676,7 @@ class NostrService {
             offer.reservedAt != null
                 ? (offer.reservedAt!.millisecondsSinceEpoch ~/ 1000).toString()
                 : ''],
+        ['created_at',(offer.createdAt.millisecondsSinceEpoch ~/ 1000).toString()],
         ['paid_at',
             offer.takerPaidAt != null
                 ? (offer.takerPaidAt!.millisecondsSinceEpoch ~/ 1000).toString()
@@ -687,7 +688,7 @@ class NostrService {
         pubKey: _signer.getPublicKey(),
         content: '',
         tags: tags,
-        createdAt: offer.createdAt.millisecondsSinceEpoch ~/ 1000,
+        createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );
 
       await _ndk.broadcast.broadcast(
@@ -756,8 +757,6 @@ class NostrService {
       case OfferStatus.conflict:
       case OfferStatus.dispute:
         return 'dispute';
-      default:
-        return 'pending';
     }
   }
 }

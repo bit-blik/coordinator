@@ -1,6 +1,7 @@
 - nostr
 
     - taker design -+
+    - restore neko loader !&@*!^*!&*#@!2
 
     RELEASE:
         - fix matrix login!
