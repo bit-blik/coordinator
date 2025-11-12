@@ -1,7 +1,10 @@
 - nostr
 
     - taker design -+
-    - restore neko loader !&@*!^*!&*#@!2
+    - going back to a blikReceived status for the maker doesn't fetch the blik code
+        - worst, if we cancel on the maker it will disappear from the maker client !??!!
+            - it changed status to cancelled in the DB!?!? why, should not be possible from blikReceived
+            - why does cancelled is returned as active offer in get_my_active_offer ???
 
     RELEASE:
         - fix matrix login!
@@ -13,7 +16,10 @@
         - deploy client web on bitblik.app
 
     - NEXT
+
         - timer when waiting for taker is calculated from created_at offer which is not at the time the offer was saved in DB but when created in client UI
+            - should be fixed now that nip69 created_at is not used anymore, to confirm!
+
         - expired offer is as active but cannot do anything with it (cannot resume offer in state...)
         - offers from custom coordinators should still show coordinator info on offer details screen
         - review terms of usage
