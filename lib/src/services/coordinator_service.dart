@@ -282,9 +282,9 @@ class CoordinatorService {
           chatId: telegramChatId,
           httpClient: _httpClient);
       print('Telegram service initialized.');
-    } else {
-      print(
-          'Telegram not configured: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set. Skipping Telegram initialization.');
+      // } else {
+      //   print(
+      //       'Telegram not configured: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set. Skipping Telegram initialization.');
     }
 
     if (paymentServiceForTest != null) {
@@ -1052,7 +1052,8 @@ class CoordinatorService {
     if (offer == null ||
         (offer.status != OfferStatus.funded &&
             offer.status != OfferStatus.invalidBlik) ||
-        ((offer.status == OfferStatus.invalidBlik || offer.status == OfferStatus.expiredBlik) &&
+        ((offer.status == OfferStatus.invalidBlik ||
+                offer.status == OfferStatus.expiredBlik) &&
             offer.takerPubkey != takerId)) {
       print('Offer $offerId not found or not available for reservation.');
       _fundedOfferTimers[offerId]?.cancel();
@@ -1295,9 +1296,31 @@ class CoordinatorService {
           }
         }
       }
-      // Cancel timer regardless, as maker is now involved.
+      // Restart timer to continue monitoring for expiration even after maker gets the code
+      // The timer should still fire after 2 minutes from blikReceivedAt to check if maker confirmed
       _blikConfirmationTimers[offerId]?.cancel();
       _blikConfirmationTimers.remove(offerId);
+      // Restart the timer, but calculate remaining time from blikReceivedAt
+      if (offer.blikReceivedAt != null) {
+        final now = _clock.now().toUtc();
+        final elapsed = now.difference(offer.blikReceivedAt!);
+        const timeoutDuration = Duration(seconds: 120);
+        final remaining = timeoutDuration - elapsed;
+        if (remaining > Duration.zero) {
+          _blikConfirmationTimers[offerId] = Timer(remaining, () {
+            print(
+                '### COORDINATOR: Raw timer expired for offer $offerId. Calling handler...');
+            _handleBlikConfirmationTimeout(offerId);
+            _blikConfirmationTimers.remove(offerId);
+          });
+        } else {
+          // Already expired, handle immediately
+          _handleBlikConfirmationTimeout(offerId);
+        }
+      } else {
+        // Fallback: restart with full duration if blikReceivedAt is missing
+        _startBlikConfirmationTimer(offerId);
+      }
     } catch (e) {
       print('Error during getBlikCodeForMaker for offer $offerId: $e');
     }
@@ -1527,7 +1550,9 @@ class CoordinatorService {
       print('Taker mismatch for cancelling reservation on offer $offerId.');
       return false;
     }
-    if (offer.status != OfferStatus.reserved && offer.status != OfferStatus.expiredBlik && offer.status != OfferStatus.invalidBlik) {
+    if (offer.status != OfferStatus.reserved &&
+        offer.status != OfferStatus.expiredBlik &&
+        offer.status != OfferStatus.invalidBlik) {
       print('Offer $offerId cannot be cancelled in status ${offer.status}.');
       _reservationTimers[offerId]?.cancel();
       _reservationTimers.remove(offerId);

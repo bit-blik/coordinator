@@ -1199,6 +1199,191 @@ void main() {
       });
     });
 
+    test('blikReceived expires to expiredBlik after 2 minutes when maker does not call getBlik', () {
+      fakeAsync((async) {
+        final offerId = 'blik-expire-no-get-offer-id';
+        final initialTime = clock.now().toUtc();
+
+        // 1. Setup: Create an offer that will transition to blikReceived
+        final offer = createTestOffer(
+          id: offerId,
+          status: OfferStatus.reserved,
+          takerPubkey: testTakerId,
+          makerPubkey: testMakerId,
+          reservedAt: initialTime.subtract(Duration(minutes: 1)),
+          createdAt: initialTime.subtract(Duration(minutes: 2)),
+        );
+        when(mockDbService.getOfferById(offerId)).thenAnswer((_) async => offer);
+
+        // Mock the update to blikReceived status
+        when(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.blikReceived,
+          blikCode: testBlikCode,
+          takerLightningAddress: testTakerLnAddress,
+          blikReceivedAt: anyNamed('blikReceivedAt'),
+        )).thenAnswer((invocation) async {
+          offer.status = OfferStatus.blikReceived;
+          offer.blikCode = testBlikCode;
+          offer.takerLightningAddress = testTakerLnAddress;
+          offer.blikReceivedAt = invocation.namedArguments[Symbol('blikReceivedAt')] as DateTime;
+          return true;
+        });
+
+        // Mock the update to expiredBlik status
+        when(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.expiredBlik,
+          blikCode: null,
+          takerLightningAddress: null,
+          blikReceivedAt: null,
+        )).thenAnswer((_) async {
+          offer.status = OfferStatus.expiredBlik;
+          offer.blikCode = null;
+          offer.takerLightningAddress = null;
+          offer.blikReceivedAt = null;
+          return true;
+        });
+
+        // 2. Taker submits blik code
+        coordinatorService.submitBlikCode(offerId, testTakerId, testBlikCode, testTakerLnAddress)
+            .then((success) {
+              expect(success, isTrue, reason: "submitBlikCode should succeed");
+            });
+        async.flushMicrotasks();
+
+        // Verify it's in blikReceived state
+        expect(offer.status, OfferStatus.blikReceived);
+        expect(offer.blikReceivedAt, isNotNull);
+
+        // 3. Elapse time, but not enough to expire (just under 2 minutes)
+        final blikConfirmationTimeout = Duration(seconds: 120);
+        async.elapse(blikConfirmationTimeout - Duration(seconds: 1));
+
+        verifyNever(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.expiredBlik,
+          blikCode: null,
+          takerLightningAddress: null,
+          blikReceivedAt: null,
+        ));
+
+        // 4. Elapse time past 2 minutes - should expire to expiredBlik
+        async.elapse(Duration(seconds: 2));
+
+        verify(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.expiredBlik,
+          blikCode: null,
+          takerLightningAddress: null,
+          blikReceivedAt: null,
+        )).called(1);
+        expect(offer.status, OfferStatus.expiredBlik);
+      });
+    });
+
+    test('blikSentToMaker expires to expiredSentBlik after 2 minutes when maker calls getBlik but does not confirm', () {
+      fakeAsync((async) {
+        final offerId = 'blik-expire-with-get-offer-id';
+        final initialTime = clock.now().toUtc();
+
+        // 1. Setup: Create an offer that will transition to blikReceived, then blikSentToMaker
+        final offer = createTestOffer(
+          id: offerId,
+          status: OfferStatus.reserved,
+          takerPubkey: testTakerId,
+          makerPubkey: testMakerId,
+          reservedAt: initialTime.subtract(Duration(minutes: 1)),
+          createdAt: initialTime.subtract(Duration(minutes: 2)),
+        );
+        when(mockDbService.getOfferById(offerId)).thenAnswer((_) async => offer);
+
+        // Mock the update to blikReceived status
+        when(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.blikReceived,
+          blikCode: testBlikCode,
+          takerLightningAddress: testTakerLnAddress,
+          blikReceivedAt: anyNamed('blikReceivedAt'),
+        )).thenAnswer((invocation) async {
+          offer.status = OfferStatus.blikReceived;
+          offer.blikCode = testBlikCode;
+          offer.takerLightningAddress = testTakerLnAddress;
+          offer.blikReceivedAt = invocation.namedArguments[Symbol('blikReceivedAt')] as DateTime;
+          return true;
+        });
+
+        // Mock the update to blikSentToMaker status (when maker calls getBlik)
+        when(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.blikSentToMaker,
+        )).thenAnswer((_) async {
+          offer.status = OfferStatus.blikSentToMaker;
+          return true;
+        });
+
+        // Mock the update to expiredSentBlik status
+        when(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.expiredSentBlik,
+          blikCode: null,
+          takerLightningAddress: null,
+          blikReceivedAt: null,
+        )).thenAnswer((_) async {
+          offer.status = OfferStatus.expiredSentBlik;
+          offer.blikCode = null;
+          offer.takerLightningAddress = null;
+          offer.blikReceivedAt = null;
+          return true;
+        });
+
+        // 2. Taker submits blik code
+        coordinatorService.submitBlikCode(offerId, testTakerId, testBlikCode, testTakerLnAddress)
+            .then((success) {
+              expect(success, isTrue, reason: "submitBlikCode should succeed");
+            });
+        async.flushMicrotasks();
+
+        // Verify it's in blikReceived state
+        expect(offer.status, OfferStatus.blikReceived);
+        expect(offer.blikReceivedAt, isNotNull);
+
+        // 3. Maker calls getBlikCodeForMaker (this should transition to blikSentToMaker and restart timer)
+        coordinatorService.getBlikCodeForMaker(offerId, testMakerId)
+            .then((blikCode) {
+              expect(blikCode, testBlikCode, reason: "getBlikCodeForMaker should return the blik code");
+            });
+        async.flushMicrotasks();
+
+        // Verify it's in blikSentToMaker state
+        expect(offer.status, OfferStatus.blikSentToMaker);
+
+        // 4. Elapse time, but not enough to expire (just under 2 minutes from blikReceivedAt)
+        final blikConfirmationTimeout = Duration(seconds: 120);
+        async.elapse(blikConfirmationTimeout - Duration(seconds: 1));
+        
+        verifyNever(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.expiredSentBlik,
+          blikCode: null,
+          takerLightningAddress: null,
+          blikReceivedAt: null,
+        ));
+        
+        // 5. Elapse time past 2 minutes - should expire to expiredSentBlik
+        async.elapse(Duration(seconds: 2));
+        
+        verify(mockDbService.updateOfferStatus(
+          offerId,
+          OfferStatus.expiredSentBlik,
+          blikCode: null,
+          takerLightningAddress: null,
+          blikReceivedAt: null,
+        )).called(1);
+        expect(offer.status, OfferStatus.expiredSentBlik);
+      });
+    });
+
   }); // End of Timeout Behaviors (using FakeAsync) group
 
   group('User Actions, State Transitions, and Edge Cases', () {
