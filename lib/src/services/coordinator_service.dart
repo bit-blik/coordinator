@@ -582,63 +582,71 @@ class CoordinatorService {
             limit: 1000),
       ];
 
-      final now = DateTime.now().toUtc();
+      final now = _clock.now().toUtc();
       const timeoutDuration = Duration(seconds: 120);
 
-      int revertedCount = 0;
+      int expiredCount = 0;
       for (final offer in offersToCheck) {
         if (offer.blikReceivedAt != null) {
           final expiryTime = offer.blikReceivedAt!.add(timeoutDuration);
           if (now.isAfter(expiryTime)) {
+            // Determine the appropriate expired status based on current status
+            final newStatus = offer.status == OfferStatus.blikReceived
+                ? OfferStatus.expiredBlik
+                : OfferStatus.expiredSentBlik;
             print(
-                'Offer ${offer.id} BLIK confirmation expired (BLIK received at ${offer.blikReceivedAt}, expired at $expiryTime). Reverting status.');
+                'Offer ${offer.id} BLIK confirmation expired (BLIK received at ${offer.blikReceivedAt}, expired at $expiryTime). Transitioning to $newStatus.');
             final success = await _dbService.updateOfferStatus(
               offer.id,
-              OfferStatus.funded,
+              newStatus,
               // Clear BLIK related fields as well
               blikCode: null,
               takerLightningAddress: null,
               blikReceivedAt: null,
             );
             if (success) {
-              revertedCount++;
+              expiredCount++;
 
               // Publish status update
-              final revertedOffer = await _dbService.getOfferById(offer.id);
-              if (revertedOffer != null) {
-                await _publishStatusUpdate(revertedOffer);
+              final expiredOffer = await _dbService.getOfferById(offer.id);
+              if (expiredOffer != null) {
+                await _publishStatusUpdate(expiredOffer);
               }
-
-              // Restart the funded offer timer
-              _startFundedOfferTimer(offer);
             } else {
               print(
-                  'Error reverting expired BLIK confirmation for offer ${offer.id} on startup.');
+                  'Error updating expired BLIK confirmation for offer ${offer.id} on startup.');
             }
           }
         } else {
           print(
-              'Warning: Offer ${offer.id} is in state ${offer.status} but has no blik_received_at timestamp. Reverting.');
+              'Warning: Offer ${offer.id} is in state ${offer.status} but has no blik_received_at timestamp. Transitioning to expired status.');
+          // Determine the appropriate expired status based on current status
+          final newStatus = offer.status == OfferStatus.blikReceived
+              ? OfferStatus.expiredBlik
+              : OfferStatus.expiredSentBlik;
           final success = await _dbService.updateOfferStatus(
             offer.id,
-            OfferStatus.funded,
+            newStatus,
             // Clear BLIK related fields as well
             blikCode: null,
             takerLightningAddress: null,
             blikReceivedAt: null, // Though it's missing, good to be explicit
           );
           if (success) {
-            revertedCount++;
-            // Restart the funded offer timer
-            _startFundedOfferTimer(offer);
+            expiredCount++;
+            // Publish status update
+            final expiredOffer = await _dbService.getOfferById(offer.id);
+            if (expiredOffer != null) {
+              await _publishStatusUpdate(expiredOffer);
+            }
           } else {
             print(
-                'Error reverting offer ${offer.id} with missing BLIK timestamp on startup.');
+                'Error updating offer ${offer.id} with missing BLIK timestamp on startup.');
           }
         }
       }
       print(
-          'Expired BLIK confirmation check complete. Reverted $revertedCount offers.');
+          'Expired BLIK confirmation check complete. Expired $expiredCount offers.');
     } catch (e) {
       print('Error during expired BLIK confirmation check: $e');
     }
