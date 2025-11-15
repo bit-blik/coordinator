@@ -262,7 +262,7 @@ class NostrService {
   /// Handle incoming encrypted requests
   Future<void> _handleRequest(Nip01Event event) async {
     try {
-      print('Received request event: ${event.id} from ${event.pubKey}');
+      // print('Received request event: ${event.id} from ${event.pubKey}');
 
       // Decrypt the request using NIP-44
       final privateKey = _signer.privateKey;

@@ -1,3 +1,12 @@
+- suggestions
+    - more info about exchange rate sources (average)
+    - wyslij blik nie na czerwone
+    - clock progress in reverse direction (time left)
+    - missing clock progress in make confirm blik (2min)
+    - confirm confirmation in make confirm blik, that there is no going back
+    - show BLIK in success screen
+    - during expiredBLIK neither maker nor taker can do anything, should be able to cancel to go back to funded
+
 - nostr
 
     - taker design -+
