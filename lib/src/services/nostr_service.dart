@@ -414,9 +414,11 @@ class NostrService {
           final now = DateTime.now().toUtc();
           final finished = activeOffers
               .where((offer) =>
-                  offer.status.name == 'takerPaid' &&
+                  offer.status.name != 'expired' &&
+                  offer.status.name != 'cancelled' ||
                   offer.takerPaidAt != null &&
-                  now.difference(offer.takerPaidAt!.toUtc()).inHours < 24)
+                  now.difference(offer.takerPaidAt!.toUtc()).inHours < 24
+          )
               .toList();
 
           final finishedList = finished.map((offer) => offer.toJson()).toList();
