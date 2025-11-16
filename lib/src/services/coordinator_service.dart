@@ -1063,7 +1063,7 @@ class CoordinatorService {
         ((offer.status == OfferStatus.invalidBlik ||
                 offer.status == OfferStatus.expiredBlik || offer.status == OfferStatus.expiredSentBlik) &&
             offer.takerPubkey != takerId)) {
-      print('Offer $offerId not found or not available for reservation.');
+      print('Offer $offerId not found or not available for reservation status:${offer?.status}.');
       _fundedOfferTimers[offerId]?.cancel();
       _fundedOfferTimers.remove(offerId);
       return null;
