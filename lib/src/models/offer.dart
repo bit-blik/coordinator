@@ -150,4 +150,8 @@ class Offer {
     // 'fiat_currency': offer.fiatCurrency,
         'taker_fees': takerFees,
   };
+  Map<String, dynamic> toJsonWithPubkeys() => toJson()..addAll({
+    'maker_pubkey': makerPubkey,
+    'taker_pubkey': takerPubkey,
+  });
 }

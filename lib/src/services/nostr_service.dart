@@ -421,7 +421,7 @@ class NostrService {
           )
               .toList();
 
-          final finishedList = finished.map((offer) => offer.toJson()).toList();
+          final finishedList = finished.map((offer) => offer.toJsonWithPubkeys()).toList();
           return {'offers': finishedList};
 
         case 'cancel_offer':

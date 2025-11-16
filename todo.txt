@@ -1,3 +1,6 @@
+
+!!!!!!!!!!! should be able to click offer in expiredSentBlik from list of finished offers and go to the appropriate screen showing that blik expired
+
 - suggestions
     - more info about exchange rate sources (average)
     - wyslij blik nie na czerwone
@@ -9,6 +12,7 @@
 
 - nostr
 
+    - test invalid invoice for taker to be paid and screen to enter new invoice
     - taker design -+
     - going back to a blikReceived status for the maker doesn't fetch the blik code
         - worst, if we cancel on the maker it will disappear from the maker client !??!!
