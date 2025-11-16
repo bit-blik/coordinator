@@ -4,7 +4,6 @@
     - wyslij blik nie na czerwone?
     - missing clock progress in make confirm blik (2min)
     - show BLIK in success screen??
-    - during expiredBLIK neither maker nor taker can do anything, should be able to cancel to go back to funded
 
 - nostr
 
@@ -14,6 +13,9 @@
         - worst, if we cancel on the maker it will disappear from the maker client !??!!
             - it changed status to cancelled in the DB!?!? why, should not be possible from blikReceived
             - why does cancelled is returned as active offer in get_my_active_offer ???
+
+    - handle reservation / cancel near offer expiration time to avoid reseting to funded
+        and fucking up the state diagram dependencies, specially when in conflict/dispute states.
 
     RELEASE:
         - fix matrix login!
