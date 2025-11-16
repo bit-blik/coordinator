@@ -1347,8 +1347,10 @@ class CoordinatorService {
       return false;
     }
 
-    if (offer.status != OfferStatus.blikReceived &&
-        offer.status != OfferStatus.blikSentToMaker) {
+    if (offer.status != OfferStatus.takerCharged &&
+        offer.status != OfferStatus.blikSentToMaker &&
+        offer.status != OfferStatus.expiredSentBlik
+    ) {
       print(
           'Offer $offerId is not in a state where BLIK can be marked invalid (current state: ${offer.status}).');
       return false;
@@ -1358,11 +1360,13 @@ class CoordinatorService {
     _blikConfirmationTimers.remove(offerId);
     print('Cancelled BLIK confirmation timer for offer $offerId (if active).');
 
+    final newStatus =  offer.status != OfferStatus.takerCharged ? OfferStatus.invalidBlik : OfferStatus.conflict;
+
     final success =
-        await _dbService.updateOfferStatus(offerId, OfferStatus.invalidBlik);
+        await _dbService.updateOfferStatus(offerId, newStatus);
 
     if (success) {
-      print('Offer $offerId status updated to invalidBlik.');
+      print('Offer $offerId status updated to $newStatus.');
 
       // Publish status update
       final updatedOffer = await _dbService.getOfferById(offerId);
@@ -1370,13 +1374,13 @@ class CoordinatorService {
         await _publishStatusUpdate(updatedOffer);
       }
     } else {
-      print('Failed to update offer $offerId status to invalidBlik in DB.');
+      print('Failed to update offer $offerId status to $newStatus in DB.');
     }
     return success;
   }
 
-  Future<bool> markOfferConflict(String offerId, String takerId) async {
-    print('Taker $takerId marking offer $offerId as conflict.');
+  Future<bool> markBlikCharged(String offerId, String takerId) async {
+    print('Taker $takerId marking offer $offerId as charged.');
     final offer = await _dbService.getOfferById(offerId);
 
     if (offer == null || offer.takerPubkey != takerId) {
@@ -1385,17 +1389,18 @@ class CoordinatorService {
       return false;
     }
 
-    if (offer.status != OfferStatus.invalidBlik) {
+    if (offer.status != OfferStatus.invalidBlik && offer.status != OfferStatus.expiredSentBlik) {
       print(
-          'Offer $offerId is not in the invalidBlik state (current state: ${offer.status}). Cannot mark as conflict.');
+          'Offer $offerId is in wrong state (current state: ${offer.status}). Cannot mark as charged.');
       return false;
     }
 
+    final newStatus = offer.status == OfferStatus.invalidBlik ? OfferStatus.conflict : OfferStatus.takerCharged;
     final success =
-        await _dbService.updateOfferStatus(offerId, OfferStatus.conflict);
+        await _dbService.updateOfferStatus(offerId, newStatus);
 
     if (success) {
-      print('Offer $offerId status updated to conflict.');
+      print('Offer $offerId status updated to $newStatus.');
 
       // Publish status update
       final updatedOffer = await _dbService.getOfferById(offerId);
@@ -1404,7 +1409,7 @@ class CoordinatorService {
         await _nostrService?.broadcastNip69OrderFromOffer(updatedOffer);
       }
     } else {
-      print('Failed to update offer $offerId status to conflict in DB.');
+      print('Failed to update offer $offerId status to $newStatus in DB.');
     }
     return success;
   }

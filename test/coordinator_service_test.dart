@@ -1639,7 +1639,7 @@ void main() {
       when(mockDbService.updateOfferStatus(testOfferId, OfferStatus.conflict))
           .thenAnswer((_) async => true);
 
-      final result = await coordinatorService.markOfferConflict(testOfferId, testTakerId);
+      final result = await coordinatorService.markBlikCharged(testOfferId, testTakerId);
 
       expect(result, isTrue);
       verify(mockDbService.updateOfferStatus(testOfferId, OfferStatus.conflict)).called(1);
@@ -1831,7 +1831,7 @@ void main() {
       final wrongTakerId = 'wrong-taker-id';
       when(mockDbService.getOfferById(testOfferId)).thenAnswer((_) async => offer);
 
-      final result = await coordinatorService.markOfferConflict(testOfferId, wrongTakerId);
+      final result = await coordinatorService.markBlikCharged(testOfferId, wrongTakerId);
 
       expect(result, isFalse);
       verifyNever(mockDbService.updateOfferStatus(testOfferId, OfferStatus.conflict));

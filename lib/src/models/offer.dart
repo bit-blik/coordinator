@@ -13,6 +13,8 @@ enum OfferStatus {
   expiredBlik, // BLIK not confirmed in time
   expiredSentBlik, // Maker did not confirm BLIK in time
 
+  takerCharged, // taker reported BLIK charged to their account
+
   invalidBlik, // Maker marked the BLIK code as invalid
   conflict, // Taker reported conflict after Maker marked BLIK as invalid
   dispute, // Maker opened a dispute after conflict

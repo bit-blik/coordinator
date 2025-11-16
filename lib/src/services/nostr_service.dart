@@ -470,14 +470,14 @@ class NostrService {
                 'Failed to mark BLIK as invalid. Offer might be in the wrong state, not found, or maker ID mismatch.');
           }
 
-        case 'mark_offer_conflict':
+        case 'mark_blik_charged':
           final offerId = params['offer_id'] as String?;
           if (offerId == null) {
             throw Exception('Missing required parameter: offer_id');
           }
 
           final success =
-              await _coordinatorService.markOfferConflict(offerId, userPubkey);
+              await _coordinatorService.markBlikCharged(offerId, userPubkey);
           if (success) {
             return {'message': 'Offer marked as conflict successfully'};
           } else {
