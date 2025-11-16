@@ -752,6 +752,7 @@ class NostrService {
       case OfferStatus.invalidBlik:
       case OfferStatus.expiredBlik:
       case OfferStatus.expiredSentBlik:
+      case OfferStatus.takerCharged:
         return 'in-progress';
       case OfferStatus.takerPaid:
         return 'success';
