@@ -1059,9 +1059,9 @@ class CoordinatorService {
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
         (offer.status != OfferStatus.funded &&
-            offer.status != OfferStatus.invalidBlik) ||
+            offer.status != OfferStatus.invalidBlik && offer.status != OfferStatus.expiredSentBlik) ||
         ((offer.status == OfferStatus.invalidBlik ||
-                offer.status == OfferStatus.expiredBlik || offer.status == OfferStatus.expiredSentBlik) &&
+                offer.status == OfferStatus.expiredBlik) &&
             offer.takerPubkey != takerId)) {
       print('Offer $offerId not found or not available for reservation status:${offer?.status}.');
       _fundedOfferTimers[offerId]?.cancel();
