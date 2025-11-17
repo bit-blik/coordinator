@@ -319,6 +319,7 @@ class DatabaseService {
       OfferStatus.blikSentToMaker.name,
       OfferStatus.expiredBlik.name,
       OfferStatus.expiredSentBlik.name,
+      OfferStatus.takerCharged.name,
       OfferStatus.invalidBlik.name,
       OfferStatus.conflict.name,
       OfferStatus.makerConfirmed.name,
