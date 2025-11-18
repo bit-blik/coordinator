@@ -1924,6 +1924,7 @@ class CoordinatorService {
         paymentHash: offer.holdInvoicePaymentHash,
         status: offer.status.name,
         timestamp: DateTime.now().toUtc(),
+        createdAt: offer.createdAt,
         reservedAt: offer.reservedAt,
         makerPubkey: offer.makerPubkey,
         takerPubkey: offer.takerPubkey,
