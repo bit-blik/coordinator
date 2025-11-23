@@ -371,7 +371,7 @@ class NostrService {
           final activeOffers = await _coordinatorService.getMyActiveOffers(userPubkey);
           if (activeOffers.isNotEmpty) {
             final offer = activeOffers.first;
-            return offer.toJson();
+            return offer.toJsonWithPubkeys();
           } else {
             return {};
           }

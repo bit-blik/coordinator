@@ -1,12 +1,6 @@
 
-- suggestions
-    - more info about exchange rate sources (average)
-    - wyslij blik nie na czerwone?
-    - missing clock progress in make confirm blik (2min)
-    - show BLIK in success screen??
-
 - nostr
-
+    - status after reserved shows to maker "view details" and jumps to taker screen
     - test invalid invoice for taker to be paid and screen to enter new invoice
     - taker design -+
     - going back to a blikReceived status for the maker doesn't fetch the blik code
@@ -27,7 +21,7 @@
         - deploy client web on bitblik.app
 
     - NEXT
-
+        - missing clock progress in make confirm blik (2min)
         - timer when waiting for taker is calculated from created_at offer which is not at the time the offer was saved in DB but when created in client UI
             - should be fixed now that nip69 created_at is not used anymore, to confirm!
 
@@ -97,4 +91,10 @@
 - stats like https://plebqr.com/ for coordinator
 - why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
 - webpushs
+
+
+- S. suggestions
+    - more info about exchange rate sources (average)
+    - wyslij blik nie na czerwone?
+    - show BLIK in success screen??
 
