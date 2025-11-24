@@ -1789,6 +1789,11 @@ class CoordinatorService {
           'Exception during taker payment for offer $offerId (using $_paymentBackendType): $e');
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
+      // Publish status update
+      final failedOffer = await _dbService.getOfferById(offerId);
+      if (failedOffer != null) {
+        await _publishStatusUpdate(failedOffer);
+      }
       return 'Exception during taker payment for offer $offerId: $e';
     }
   }
