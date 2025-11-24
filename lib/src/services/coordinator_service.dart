@@ -1706,6 +1706,10 @@ class CoordinatorService {
       print('Async Exception during taker payment for offer $offerId: $e');
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
+      final failedOffer = await _dbService.getOfferById(offerId);
+      if (failedOffer != null) {
+        await _publishStatusUpdate(failedOffer);
+      }
     }
   }
 
