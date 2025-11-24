@@ -476,7 +476,7 @@ class CoordinatorService {
                 'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to startup expiration check.');
           } catch (e) {
             print(
-                'Error cancelling hold invoice for expired offer ${offer.id} using $_paymentBackendType: $e');
+                'Error cancelling hold invoice for expired offer ${offer.id} using  $e');
           }
           final dbSuccess =
               await _dbService.updateOfferStatus(offer.id, OfferStatus.expired);
@@ -971,7 +971,7 @@ class CoordinatorService {
           }
         } catch (e) {
           print(
-              'Error cancelling hold invoice for expired offer ${offer.id} using $_paymentBackendType: $e');
+              'Error cancelling hold invoice for expired offer ${offer.id} using  $e');
           return; // Exit if cancellation fails
         }
       } else {
@@ -1628,7 +1628,7 @@ class CoordinatorService {
             'Hold invoice for offer $offerId cancelled successfully via $_paymentBackendType.');
       } catch (e) {
         print(
-            'Error cancelling hold invoice for offer $offerId using $_paymentBackendType: $e');
+            'Error cancelling hold invoice for offer $offerId using  $e');
       }
     } else {
       print(
@@ -1743,7 +1743,7 @@ class CoordinatorService {
 
       final feeLimitSat = offer.makerFees + 100;
       print(
-          '$_paymentBackendType: Attempting to pay invoice for offer $offerId. Amount: $netAmountSats sats, Fee limit: $feeLimitSat sats.');
+          ' Attempting to pay invoice for offer $offerId. Amount: $netAmountSats sats, Fee limit: $feeLimitSat sats.');
 
       final paymentResult = await _paymentBackend!.payInvoice(
         invoice: takerInvoice,
@@ -1753,14 +1753,14 @@ class CoordinatorService {
 
       if (paymentResult.isSuccess) {
         print(
-            '$_paymentBackendType: Successfully paid taker for offer $offerId. Preimage: ${paymentResult.paymentPreimage}');
+            ' Successfully paid taker for offer $offerId. Preimage: ${paymentResult.paymentPreimage}');
         await Future.delayed(_kDebugDelayDuration);
         await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
             takerFees: takerFees);
         await _dbService.updateTakerInvoiceFees(
             offerId, paymentResult.feeSat ?? 0);
         print(
-            '$_paymentBackendType: Updated taker invoice fees to ${paymentResult.feeSat ?? 0} sats for offer $offerId.');
+            ' Updated taker invoice fees to ${paymentResult.feeSat ?? 0} sats for offer $offerId.');
 
         // Publish status update
         final paidOffer = await _dbService.getOfferById(offerId);
@@ -1772,7 +1772,7 @@ class CoordinatorService {
         return null; // Success
       } else {
         print(
-            '$_paymentBackendType: Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}');
+            ' Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
 
@@ -1782,7 +1782,7 @@ class CoordinatorService {
           await _publishStatusUpdate(failedOffer);
         }
 
-        return '$_paymentBackendType: Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}';
+        return ' Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}';
       }
     } catch (e) {
       print(
