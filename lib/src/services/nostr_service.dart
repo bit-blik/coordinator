@@ -627,6 +627,8 @@ class NostrService {
         ['reserved_at', offer.reservedAt != null ? (offer.reservedAt!.millisecondsSinceEpoch ~/ 1000).toString() : ''],
         ['created_at', (offer.createdAt.millisecondsSinceEpoch ~/ 1000).toString()],
         ['paid_at', offer.takerPaidAt != null ? (offer.takerPaidAt!.millisecondsSinceEpoch ~/ 1000).toString() : ''],
+        if (offer.takerFees != null && offer.takerFees! > 0) ['taker_fees', offer.takerFees.toString()],
+        if (offer.makerFees > 0) ['maker_fees', offer.makerFees.toString()],
       ];
 
       final event = Nip01Event(
