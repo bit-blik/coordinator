@@ -1673,6 +1673,10 @@ class CoordinatorService {
       print('Async Error: Taker Lightning Address missing for offer $offerId.');
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
+      final failedOffer = await _dbService.getOfferById(offerId);
+      if (failedOffer != null) {
+        await _publishStatusUpdate(failedOffer);
+      }
       return;
     }
 
@@ -1691,6 +1695,10 @@ class CoordinatorService {
             'Async Error: Failed to resolve LNURL for net amount $netAmountSats for offer $offerId.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
+        final failedOffer = await _dbService.getOfferById(offerId);
+        if (failedOffer != null) {
+          await _publishStatusUpdate(failedOffer);
+        }
         return;
       }
 
