@@ -251,7 +251,7 @@ class CoordinatorService {
     _reservationTimeoutSeconds = int.tryParse(_env['RESERVATION_SECONDS'] ?? '') ?? 30;
     _fundedExpireTimeoutSeconds = int.tryParse(_env['FUNDED_EXPIRY_SECONDS'] ?? '') ?? 600;
     _takerChargedAutoConfirmTimeoutSeconds =
-        int.tryParse(_env['TAKER_CHAREGD_AUTO_CONFIRM_SECONDS'] ?? '') ?? 3600; // 1h
+        int.tryParse(_env['TAKER_CHARGED_AUTO_CONFIRM_SECONDS'] ?? '') ?? 3600; // 1h
 
     _makerFeePercentage = double.tryParse(_env['MAKER_FEE'] ?? '') ?? 0.5; // Default to 0.5%
     _takerFeePercentage = double.tryParse(_env['TAKER_FEE'] ?? '') ?? 0.5; // Default to 0.5%
