@@ -286,6 +286,7 @@ class CoordinatorService {
     await _checkExpiredFundedOffers();
     await _checkExpiredReservations();
     await _checkExpiredBlikConfirmations();
+    await _checkTakerChargedAutoConfirm();
   }
 
   Future<void> _initializeMatrixClient() async {
@@ -401,7 +402,7 @@ class CoordinatorService {
     try {
       final fundedOffers = await _dbService.getOffersByStatus(OfferStatus.funded, limit: 1000);
       final now = DateTime.now().toUtc();
-      const expirationDuration = Duration(minutes: 10);
+      final expirationDuration = Duration(seconds: _fundedExpireTimeoutSeconds);
 
       int cancelledCount = 0;
       for (final offer in fundedOffers) {
@@ -435,6 +436,36 @@ class CoordinatorService {
       print('Expired funded offer check complete. Marked $cancelledCount offers as expired.');
     } catch (e) {
       print('Error during expired funded offer check: $e');
+    }
+  }
+
+  Future<void> _checkTakerChargedAutoConfirm() async {
+    print('Checking for takerCharged auto confirm on startup...');
+    if (_paymentBackend == null) {
+      print("Skipping, no payment backend configured.");
+      return;
+    }
+    try {
+      final offers = await _dbService.getOffersByStatus(OfferStatus.takerCharged, limit: 1000);
+      final now = DateTime.now().toUtc();
+      final expirationDuration = Duration(seconds: _takerChargedAutoConfirmTimeoutSeconds);
+
+      int cancelledCount = 0;
+      for (final offer in offers) {
+        final receivedAt = offer.blikReceivedAt;
+        final expiryTime = receivedAt?.add(expirationDuration);
+        if (expiryTime!=null && now.isAfter(expiryTime)) {
+          print('Offer ${offer.id} takerCharged auto confirm (blikReceived at $receivedAt, expired at $expiryTime). Auto confirming.');
+          try {
+            await confirmMakerPayment(offer.id, offer.makerPubkey);
+          } catch (e) {
+            print('Error takerCharged auto confirming for offer ${offer.id} using  $e');
+          }
+        }
+      }
+      print('takerCharged auto confirm offer check complete. Auto confirmed $cancelledCount offers.');
+    } catch (e) {
+      print('Error during takerCharged auto confirm check: $e');
     }
   }
 
