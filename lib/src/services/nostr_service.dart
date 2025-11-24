@@ -246,40 +246,38 @@ class NostrService {
 
   /// Handle incoming encrypted requests
   Future<void> _handleRequest(Nip01Event event) async {
+    // print('Received request event: ${event.id} from ${event.pubKey}');
+
+    // Decrypt the request using NIP-44
+    final privateKey = _signer.privateKey;
+    if (privateKey == null) {
+      throw Exception('No private key available for decryption');
+    }
+
+    final decryptedContent = await Nip44.decryptMessage(
+      event.content,
+      privateKey,
+      event.pubKey,
+    );
+
+    print('Decrypted request: $decryptedContent');
+
+    // Parse the request
+    final request = jsonDecode(decryptedContent) as Map<String, dynamic>;
+    final method = request['method'] as String?;
+    final params = request['params'] as Map<String, dynamic>? ?? {};
+    final id = request['id'] as String?;
+
+    if (method == null || id == null) {
+      await _sendErrorResponse(event.pubKey, id, 'INVALID_REQUEST', 'Missing method or id');
+      return;
+    }
     try {
-      // print('Received request event: ${event.id} from ${event.pubKey}');
-
-      // Decrypt the request using NIP-44
-      final privateKey = _signer.privateKey;
-      if (privateKey == null) {
-        throw Exception('No private key available for decryption');
-      }
-
-      final decryptedContent = await Nip44.decryptMessage(
-        event.content,
-        privateKey,
-        event.pubKey,
-      );
-
-      print('Decrypted request: $decryptedContent');
-
-      // Parse the request
-      final request = jsonDecode(decryptedContent) as Map<String, dynamic>;
-      final method = request['method'] as String?;
-      final params = request['params'] as Map<String, dynamic>? ?? {};
-      final id = request['id'] as String?;
-
-      if (method == null || id == null) {
-        await _sendErrorResponse(event.pubKey, id, 'INVALID_REQUEST', 'Missing method or id');
-        return;
-      }
-
-      // Process the request
       final response = await _processRequest(method, params, event.pubKey);
       await _sendResponse(event.pubKey, id, response);
     } catch (e) {
       print('Error handling request: $e');
-      await _sendErrorResponse(event.pubKey, null, 'INTERNAL_ERROR', e.toString());
+      await _sendErrorResponse(event.pubKey, id, 'INTERNAL_ERROR', e.toString());
     }
   }
 
