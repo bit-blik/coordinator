@@ -3,9 +3,10 @@
 
     - ??? in invalidBlik status maker has no way out, so taker can DoS attack maker by sending invalid blik codes
         - max 3 blik codes for same taker pubKey?
+        - timeout for taker to decide on what to do
         - bond from taker to start reservation?
 
-    - how to communicate with maker/taker on dispute DM need signing of messages?
+    - how to communicate with maker/taker on dispute?
         - send nostr DM to coordinator (which NIP?)
         - sign message tool in neko
 
@@ -16,7 +17,7 @@
             - matrix element group
         - zapstore publish
         - github release
-        - deploy client web on bitblik.app
+        - change DNS bitblik.app
 
     - NEXT
         - review terms of use

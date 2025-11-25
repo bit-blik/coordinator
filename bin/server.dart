@@ -55,11 +55,12 @@ Future<void> main(List<String> args) async {
     );
     await coordinatorService.init();
 
-
     await nostrService.init(privateKey: env['NOSTR_PRIVATE_KEY'] ?? '');
 
     // Set the Nostr service in the coordinator service for status updates
     coordinatorService.setNostrService(nostrService);
+
+    await coordinatorService.doInitialCheckStatuses();
 
     // Rebroadcast offers from last 24 hours if NostrService is available
     try {

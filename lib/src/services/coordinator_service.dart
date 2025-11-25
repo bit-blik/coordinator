@@ -282,6 +282,9 @@ class CoordinatorService {
       await _initializePaymentBackend();
     }
     print('CoordinatorService initialized with $_paymentBackendType backend.');
+  }
+
+  Future<void> doInitialCheckStatuses() async {
     await _initializeMatrixClient();
     await _checkExpiredFundedOffers();
     await _checkExpiredReservations();
