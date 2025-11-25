@@ -1,101 +1,100 @@
 
-- nostr
 
-    - test everything again
-        - !!!!!!!!!!!! others do not see the status changing to reserved on list and details
-    - psql backup cron
+=== CRITICAL BUGS
+- !!! others do not see the status changing to reserved on list and details
+    - in progress offers should be listed in offer list with that in progress, timer
+- !! settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 
-    - NEXT
-        - review terms of use
-        - how to communicate with maker/taker on dispute?
-            - send nostr DM to coordinator (which NIP?)
-            - sign message tool in neko
-        - after opening/closing numeric keyboard the bottom bar stays big height - but only when CANCEL/CLOSE keyboard (graphene only?)
-        - ??? in invalidBlik status maker has no way out, so taker can DoS attack maker by sending invalid blik codes
-            - max 3 blik codes for same taker pubKey?
-            - timeout for taker to decide on what to do
-            - bond from taker to start reservation?
-        - make desktop version not full wide screen but just max width 600px or something
-        - missing clock progress in make confirm blik (2min)
-        - after blikReceived the offer details should not show the reservation time countdown since it's wrong amount of time
-            - maybe update offer status to in-progress or something !??!?!?!
+=== FEATURES
+-!!! premium % above market price for maker
 
-        - timer when waiting for taker is calculated from created_at offer which is not at the time the offer was saved in DB but when created in client UI
-            - should be fixed now that nip69 created_at is not used anymore, to confirm!
-        - handle reservation / cancel near offer expiration time to avoid reseting to funded
-            and fucking up the state diagram dependencies, specially when in conflict/dispute states.
-
-
-        - offers from custom coordinators should still show coordinator info on offer details screen
-        - info + checkbox risk of refund BLIK acceptance
-        - should confirm offer data from coordinator and not only rely on nostr KIND_OFFER event, for offer list and details
-        - offer details screen should subscribe to offer status change and update status in UI
-          - and show timers (reserved time left, blik code validity time left)
-          - this is needed when it's not a get_my_active_offer, since status updates it's only for active per key
-        - on invalidBlik status, it should be possible to cancel which would also cancel the reservation and go back to funded
-            - needs support code in coordinator workflow
-        - coordinator metadata kind-0
-            - name
-            - avatar picture
-            - relays (nip-65)
-        - coordinator discovery on bootstrap many relays (purplepag.es)
-        - whitelist coordinators:
-            - from bitblik followed list
-            - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
-
-        - timer 120s on /confirm-blik and after inform of 48h (?) it will automatically be settled in taker's favor
-        - retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
-        - in progress offers should be listed in offer list with that in progress, timer
-        - if maker confirms during conflict (made mistake) the taker conflict screen should listen to such status and show process paying screen
-        - add custom coordinator by npub (store in client preferences)
-        - past/finished/history offers for given neko
-        - relays for coordinator fetched from nip-65
-            - if non existent and configured in .env broadcast nip-65 event with relay list
-        - remove circular dependency between coordinator/nostr services !!
-        - use ndk.accounts instead of single signer (multiple nekos)
-        - fix the tests for nostr service not available
-        - public stats / coordinator info should not require client pubkey (rpc signing request)
-
-
-- discount codes (on fees) for certain keys at the coordinator
-- list of current/finished offers for current Neko in menu
-- rate coordinators on nostr (find which NIP for ratings)
-- premium % above market price for maker
-- NWC wallet integration
+-!!! NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
+    - use ndk.accounts instead of single signer (multiple nekos)
+    - maybe ndk_flutter luc's widgets?
 
-- reputation mode (maybe using nostr profiles and WoT?)
+-!!! info + checkbox risk of refund BLIK acceptance
+    - choice of type of payment
+        - physical good in shop
+        - atm cash out
+        - online service/product
 
-- notifications
+-!! how to communicate with maker/taker on dispute?
+    - send nostr DM to coordinator (which NIP?)
+    - sign message tool in neko
+
+-!! ??? in invalidBlik status maker has no way out, so taker can DoS attack maker by sending invalid blik codes
+    - max 3 blik codes for same taker pubKey?
+    - timeout for taker to decide on what to do
+    - bond from taker to start reservation?
+        - fidelity bond for taker
+
+-! list of current/finished offers for current Neko in menu
+-! reputation mode (maybe using nostr profiles and WoT?)
+-! notifications moar!
     - by nostr
     - by foreground service
+    - webpushs?
 
-- settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
-- fidelity bond for taker
-- while in /taker-conflict if maker confirms it should refresh and show taker success
+- dark theme
 
-- better details on MakerSuccessScreen
-- save the failed payment reason (could not get an invoice from lnurl/ no route /??) and show it on takerFailedPayment screen
+=== TASKS
+-!!! review terms of use
+-!! psql backup cron
 
-- timer countdown of 2min for validity of blik code in both taker/maker screens with info what to do next.
-- in taker screen show when maker received blik ( blikReceived -> blikSentToMaker)
+=== IMPROVEMENTS
+-!!! missing clock progress in make confirm blik (2min)
+    - and after inform of 60m it will automatically be settled in taker's favor
+-!!! whitelist coordinators:
+    - from bitblik followed list
+    - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
+-!! coordinator metadata kind-0
+    - name
+    - avatar picture
+    - relays (nip-65)
+        - relays for coordinator fetched from nip-65
+            - if non existent and configured in .env broadcast nip-65 event with relay list
+
+
+- timer when waiting for taker is calculated from created_at offer which is not at the time the offer was saved in DB but when created in client UI
+    - should be fixed now that nip69 created_at is not used anymore, to confirm!
+-?? should confirm offer data from coordinator and not only rely on nostr KIND_OFFER event, for offer list and details
 
 - sound effects when status changes
 - local notifications when status changes
 
-======
-- dark theme
+------------------------------------------------------------------
+- after blikReceived the offer details should not show the reservation time countdown since it's wrong amount of time
+    - maybe update offer status to in-progress or something !??!?!?!
+- offer details screen should subscribe to offer status change and update status in UI
+  - and show timers (reserved time left, blik code validity time left)
+  - this is needed when it's not a get_my_active_offer, since status updates it's only for active per key
+- coordinator discovery on bootstrap many relays (purplepag.es)
 
-======
+- retry to subscribe in nostr service for KIND_COORDINATOR_REQUEST (client requests) onError
+- if maker confirms during conflict (made mistake) the taker conflict screen should listen to such status and show process paying screen
+- remove circular dependency between coordinator/nostr services !!
+- fix the tests for nostr service not available
+- public stats / coordinator info should not require client pubkey (rpc signing request)
+
+
+- discount codes (on fees) for certain keys at the coordinator
+- rate coordinators on nostr (find which NIP for ratings)
+
+
+- after opening/closing numeric keyboard the bottom bar stays big height - but only when CANCEL/CLOSE keyboard (graphene only?)
+- while in /taker-conflict if maker confirms it should refresh and show taker success
+
+- save the failed payment reason (could not get an invoice from lnurl/ no route /??) and show it on takerFailedPayment screen
+
 - extract common code between coordinator & client (offer model)
 - coordinator /admin/* for admin actions on allowed pubkeys
 - stats like https://plebqr.com/ for coordinator
-- why it doesn't work well on mobile browsers (vanadium, ironfox) -> https://developer.chrome.com/docs/devtools/remote-debugging
-- webpushs
-
-
 - S. suggestions
     - more info about exchange rate sources (average)
     - wyslij blik nie na czerwone?
-    - show BLIK in success screen??
 
+=== ???
+- handle reservation / cancel near offer expiration time to avoid reseting to funded
+    and fucking up the state diagram dependencies, specially when in conflict/dispute states.
+- offers from custom coordinators should still show coordinator info on offer details screen
