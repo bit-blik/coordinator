@@ -1,26 +1,20 @@
 
 - nostr
 
-    - ??? in invalidBlik status maker has no way out, so taker can DoS attack maker by sending invalid blik codes
-        - max 3 blik codes for same taker pubKey?
-        - timeout for taker to decide on what to do
-        - bond from taker to start reservation?
-
-    - how to communicate with maker/taker on dispute?
-        - send nostr DM to coordinator (which NIP?)
-        - sign message tool in neko
-
-    RELEASE:
-        - fix matrix login!
-        - change everywhere new logo
-            - simplex group
-            - matrix element group
-        - zapstore publish
-        - github release
-        - change DNS bitblik.app
+    - test everything again
+        - !!!!!!!!!!!! others do not see the status changing to reserved on list and details
+    - psql backup cron
 
     - NEXT
         - review terms of use
+        - how to communicate with maker/taker on dispute?
+            - send nostr DM to coordinator (which NIP?)
+            - sign message tool in neko
+        - after opening/closing numeric keyboard the bottom bar stays big height - but only when CANCEL/CLOSE keyboard (graphene only?)
+        - ??? in invalidBlik status maker has no way out, so taker can DoS attack maker by sending invalid blik codes
+            - max 3 blik codes for same taker pubKey?
+            - timeout for taker to decide on what to do
+            - bond from taker to start reservation?
         - make desktop version not full wide screen but just max width 600px or something
         - missing clock progress in make confirm blik (2min)
         - after blikReceived the offer details should not show the reservation time countdown since it's wrong amount of time
