@@ -20,6 +20,7 @@
 
     - NEXT
         - review terms of use
+        - make desktop version not full wide screen but just max width 600px or something
         - missing clock progress in make confirm blik (2min)
         - after blikReceived the offer details should not show the reservation time countdown since it's wrong amount of time
             - maybe update offer status to in-progress or something !??!?!?!
