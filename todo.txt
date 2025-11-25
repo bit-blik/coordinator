@@ -1,15 +1,13 @@
 
 - nostr
-    - status after reserved shows to maker "view details" and jumps to taker screen
-    - test invalid invoice for taker to be paid and screen to enter new invoice
-    - taker design -+
-    - going back to a blikReceived status for the maker doesn't fetch the blik code
-        - worst, if we cancel on the maker it will disappear from the maker client !??!!
-            - it changed status to cancelled in the DB!?!? why, should not be possible from blikReceived
-            - why does cancelled is returned as active offer in get_my_active_offer ???
 
-    - handle reservation / cancel near offer expiration time to avoid reseting to funded
-        and fucking up the state diagram dependencies, specially when in conflict/dispute states.
+    - ??? in invalidBlik status maker has no way out, so taker can DoS attack maker by sending invalid blik codes
+        - max 3 blik codes for same taker pubKey?
+        - bond from taker to start reservation?
+
+    - how to communicate with maker/taker on dispute DM need signing of messages?
+        - send nostr DM to coordinator (which NIP?)
+        - sign message tool in neko
 
     RELEASE:
         - fix matrix login!
@@ -21,13 +19,18 @@
         - deploy client web on bitblik.app
 
     - NEXT
+        - review terms of use
         - missing clock progress in make confirm blik (2min)
+        - after blikReceived the offer details should not show the reservation time countdown since it's wrong amount of time
+            - maybe update offer status to in-progress or something !??!?!?!
+
         - timer when waiting for taker is calculated from created_at offer which is not at the time the offer was saved in DB but when created in client UI
             - should be fixed now that nip69 created_at is not used anymore, to confirm!
+        - handle reservation / cancel near offer expiration time to avoid reseting to funded
+            and fucking up the state diagram dependencies, specially when in conflict/dispute states.
 
-        - expired offer is as active but cannot do anything with it (cannot resume offer in state...)
+
         - offers from custom coordinators should still show coordinator info on offer details screen
-        - review terms of usage
         - info + checkbox risk of refund BLIK acceptance
         - should confirm offer data from coordinator and not only rely on nostr KIND_OFFER event, for offer list and details
         - offer details screen should subscribe to offer status change and update status in UI
@@ -57,7 +60,9 @@
         - fix the tests for nostr service not available
         - public stats / coordinator info should not require client pubkey (rpc signing request)
 
-- list of current/finished offers in menu
+
+- discount codes (on fees) for certain keys at the coordinator
+- list of current/finished offers for current Neko in menu
 - rate coordinators on nostr (find which NIP for ratings)
 - premium % above market price for maker
 - NWC wallet integration
