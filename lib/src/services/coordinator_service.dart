@@ -918,7 +918,7 @@ class CoordinatorService {
   void _startTakerChargedTimer(Offer offer) {
     if (offer.status != OfferStatus.takerCharged || offer.blikReceivedAt == null) {
       print(
-          'Error: Cannot start taker charged timer for offer ${offer.id} without blikReceivedAt timestamp or not in state takerCharged');
+          'Error: Cannot start taker charged timer for offer ${offer.id} without blikReceivedAt timestamp or not in state takerCharged, status is ${offer.status} blikReceivedAt: ${offer.blikReceivedAt}');
       return;
     }
     _takerChargedTimers[offer.id]?.cancel();
