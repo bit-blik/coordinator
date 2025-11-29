@@ -1,9 +1,11 @@
 
-
 === CRITICAL BUGS
+- !!!! loses the created offer after payment
 - !!! others do not see the status changing to reserved on list and details
     - in progress offers should be listed in offer list with that in progress, timer
 - !! settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
+- !! refresh (pull-down) offers list does not work
+- ! pay in wallet on browser when no webln available should launch lightning:// with choice of wallet apps
 
 === FEATURES
 -!!! premium % above market price for maker
