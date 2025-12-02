@@ -236,11 +236,7 @@ class CoordinatorService {
     _coordinatorName = _env['NAME'] ?? 'BitBlik Coordinator';
     _coordinatorIconUrl = _env['ICON_URL'] ?? 'https://bitblik.app/splash/img/dark-2x.png';
 
-    // Terms of usage is required from environment variable
-    final termsOfUsageEnv = _env['TERMS_OF_USAGE_NADDR'];
-    if (termsOfUsageEnv == null || termsOfUsageEnv.isEmpty) {
-      throw Exception('TERMS_OF_USAGE_NADDR environment variable is required');
-    }
+    final termsOfUsageEnv = _env['TERMS_OF_USAGE_NADDR'] ?? '';
     _termsOfUsageNaddr = termsOfUsageEnv;
 
     _minAmountSats = int.tryParse(_env['MIN_AMOUNT_SATS'] ?? '') ?? 1000;
