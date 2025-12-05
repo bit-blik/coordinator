@@ -1329,15 +1329,14 @@ class CoordinatorService {
     if (success) {
       print('Offer $offerId status updated to $newStatus.');
 
-      if (newStatus == OfferStatus.takerCharged) {
-        _startTakerChargedTimer(offer);
-      }
-
       // Publish status update
       final updatedOffer = await _dbService.getOfferById(offerId);
       if (updatedOffer != null) {
         await _publishStatusUpdate(updatedOffer);
         await _nostrService?.broadcastNip69OrderFromOffer(updatedOffer);
+      }
+      if (newStatus == OfferStatus.takerCharged) {
+        _startTakerChargedTimer(offer);
       }
     } else {
       print('Failed to update offer $offerId status to $newStatus in DB.');
