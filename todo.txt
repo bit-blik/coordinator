@@ -1,5 +1,8 @@
+Error: Cannot start taker charged timer for offer 0218d39b-ca42-47b7-8a3e-2aca38bd2696 without blikReceivedAt timestamp or not in state takerCharged, status is OfferStatus.expiredSentBlik blikReceivedAt: 2025-12-05 13:32:37.240359
+
 
 === CRITICAL BUGS
+- !!!! cannot get info from coordinator on saunter's ios
 - !!!! loses the created offer after payment???
 - !! settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 - !! refresh (pull-down) offers list does not work
@@ -9,6 +12,7 @@
 
 === FEATURES
 -!!! premium % above market price for maker
+-!!! start the offer with higher taker fees, and if some seconds it's still not reserved decrease the taker fees and send new notification to groups
 
 -!!! NWC wallet integration
     - ndk.wallets (NWC) from leo's branch
