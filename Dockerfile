@@ -3,9 +3,6 @@ FROM dart:3.10.4-sdk AS build
 
 WORKDIR /app
 
-# Copy pubspec and get dependencies first for caching
-#COPY pubspec.* ./
-
 # Copy the rest of the application code.
 COPY . .
 RUN apt-get update && apt-get install -y wget
