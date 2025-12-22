@@ -1,5 +1,5 @@
 # Use the official Dart image.
-FROM dart:3.9.2-sdk AS build
+FROM dart:3.10.4-sdk AS build
 
 WORKDIR /app
 

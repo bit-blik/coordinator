@@ -4,7 +4,6 @@ import 'dart:math';
 
 import 'package:bip340/bip340.dart' as bip340;
 import 'package:ndk/ndk.dart';
-import 'package:ndk/shared/nips/nip19/nip19.dart';
 import 'package:ndk/shared/nips/nip44/nip44.dart';
 
 import 'coordinator_service.dart';
@@ -16,6 +15,7 @@ class NostrService {
   final CoordinatorService _coordinatorService;
   late final Ndk _ndk;
   late Bip340EventSigner _signer;
+  final RustEventVerifier rustEventVerifier = RustEventVerifier();
 
   // Relay configuration
   final List<String> _relays;
@@ -43,7 +43,7 @@ class NostrService {
     _ndk = Ndk(
       NdkConfig(
           cache: MemCacheManager(),
-          eventVerifier: Bip340EventVerifier(), //RustEventVerifier(),
+          eventVerifier: rustEventVerifier,
           bootstrapRelays: _relays,
           logLevel: LogLevel.info),
     );

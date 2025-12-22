@@ -27,11 +27,12 @@ dependencies:
   dotenv: ^4.2.0 # For loading environment variables from .env file
 #  ndk_rust_verifier: 0.4.2-dev.15
   ndk:
+#    path: ../../ndk/packages/ndk
   # 0.6.0-dev.10
     git:
       url: https://github.com/relaystr/ndk.git
-      ref: 106de0418e3435c482a79380ec4de9daf1a4e108
       path: packages/ndk
+      ref: 18fdc6a4e1747f9675a5d730f53efd6cd2af888e
   #flutter_olm: ^2.0.0
   #flutter_openssl_crypto: ^0.5.0
   path: ^1.8.0
