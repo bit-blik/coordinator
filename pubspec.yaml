@@ -25,13 +25,18 @@ dependencies:
   bip340: ^0.3.0
   logger: ^2.5.0
   dotenv: ^4.2.0 # For loading environment variables from .env file
-#  ndk_rust_verifier: 0.4.2-dev.15
-  ndk:
-  # 0.6.0-dev.10
-    git:
-      url: https://github.com/relaystr/ndk.git
-      ref: 106de0418e3435c482a79380ec4de9daf1a4e108
-      path: packages/ndk
+  ndk_rust_verifier: 0.4.2-dev.15
+#  ndk_rust_verifier:
+#    path: ../../ndk/packages/rust_verifier
+
+#  ndk: 0.6.0-dev.10
+#  ndk:
+#    git:
+#      url: https://github.com/relaystr/ndk.git
+#      ref: 106de0418e3435c482a79380ec4de9daf1a4e108
+#      path: packages/ndk
+#  ndk:
+#    path: ../../ndk/packages/ndk
   #flutter_olm: ^2.0.0
   #flutter_openssl_crypto: ^0.5.0
   path: ^1.8.0
