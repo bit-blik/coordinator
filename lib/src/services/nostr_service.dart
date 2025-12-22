@@ -6,6 +6,7 @@ import 'package:bip340/bip340.dart' as bip340;
 import 'package:ndk/ndk.dart';
 import 'package:ndk/shared/nips/nip19/nip19.dart';
 import 'package:ndk/shared/nips/nip44/nip44.dart';
+import 'package:ndk_rust_verifier/data_layer/repositories/verifiers/rust_event_verifier.dart';
 
 import 'coordinator_service.dart';
 import '../models/offer.dart';
@@ -21,13 +22,18 @@ class NostrService {
   final List<String> _relays;
 
   // Event kinds
-  static const int KIND_COORDINATOR_INFO = 15125; // Application-specific info event (replaceable)
-  static const int KIND_COORDINATOR_REQUEST = 25195; // NIP-47 style request event
-  static const int KIND_COORDINATOR_RESPONSE = 25196; // NIP-47 style response event
-  static const int KIND_OFFER_STATUS_UPDATE = 25197; // Offer status update notifications
+  static const int KIND_COORDINATOR_INFO =
+      15125; // Application-specific info event (replaceable)
+  static const int KIND_COORDINATOR_REQUEST =
+      25195; // NIP-47 style request event
+  static const int KIND_COORDINATOR_RESPONSE =
+      25196; // NIP-47 style response event
+  static const int KIND_OFFER_STATUS_UPDATE =
+      25197; // Offer status update notifications
 
   // Subscription for incoming requests
   NdkResponse? _requestSubscription;
+  RustEventVerifier rustEventVerifier = RustEventVerifier();
 
   NostrService(
     this._coordinatorService, {
@@ -43,7 +49,7 @@ class NostrService {
     _ndk = Ndk(
       NdkConfig(
           cache: MemCacheManager(),
-          eventVerifier: Bip340EventVerifier(), //RustEventVerifier(),
+          eventVerifier: rustEventVerifier,
           bootstrapRelays: _relays,
           logLevel: LogLevel.info),
     );
@@ -52,7 +58,8 @@ class NostrService {
     if (privateKey.isNotEmpty) {
       final decodedKey = _decodeNsecKey(privateKey);
       if (decodedKey == null) {
-        throw Exception('Invalid private key format. Use hex or nsec1... format.');
+        throw Exception(
+            'Invalid private key format. Use hex or nsec1... format.');
       }
 
       _signer = Bip340EventSigner(
@@ -62,8 +69,11 @@ class NostrService {
     } else {
       // Generate new keys
       final random = Random.secure();
-      final privateKeyBytes = List<int>.generate(32, (_) => random.nextInt(256));
-      final privateKeyHex = privateKeyBytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join('');
+      final privateKeyBytes =
+          List<int>.generate(32, (_) => random.nextInt(256));
+      final privateKeyHex = privateKeyBytes
+          .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+          .join('');
 
       _signer = Bip340EventSigner(
         privateKey: privateKeyHex,
@@ -130,7 +140,8 @@ class NostrService {
       );
 
       await _signer.sign(event);
-      await _ndk.broadcast.broadcast(nostrEvent: event, specificRelays: _relays);
+      await _ndk.broadcast
+          .broadcast(nostrEvent: event, specificRelays: _relays);
 
       print('Published coordinator info event: ${event.id}');
     } catch (e) {
@@ -155,22 +166,29 @@ class NostrService {
         'offer_id': offerId,
         'payment_hash': paymentHash,
         'status': status,
-        'created_at': createdAt != null ? createdAt.millisecondsSinceEpoch ~/ 1000 : null,
-        'reserved_at': reservedAt != null ? reservedAt.millisecondsSinceEpoch ~/ 1000 : null,
-        'timestamp': timestamp.millisecondsSinceEpoch ~/ 1000, // Unix timestamp in seconds
+        'created_at':
+            createdAt != null ? createdAt.millisecondsSinceEpoch ~/ 1000 : null,
+        'reserved_at': reservedAt != null
+            ? reservedAt.millisecondsSinceEpoch ~/ 1000
+            : null,
+        'timestamp': timestamp.millisecondsSinceEpoch ~/
+            1000, // Unix timestamp in seconds
       };
 
       final statusUpdateJson = jsonEncode(statusUpdate);
 
       // Send encrypted update to maker
-      await _sendEncryptedStatusUpdate(makerPubkey, statusUpdateJson, offerId, status, paymentHash);
+      await _sendEncryptedStatusUpdate(
+          makerPubkey, statusUpdateJson, offerId, status, paymentHash);
 
       // Send encrypted update to taker if available
       if (takerPubkey != null && takerPubkey.isNotEmpty) {
-        await _sendEncryptedStatusUpdate(takerPubkey, statusUpdateJson, offerId, status, paymentHash);
+        await _sendEncryptedStatusUpdate(
+            takerPubkey, statusUpdateJson, offerId, status, paymentHash);
       }
 
-      print('Sent encrypted status updates for offer $offerId with status $status to maker and taker');
+      print(
+          'Sent encrypted status updates for offer $offerId with status $status to maker and taker');
     } catch (e) {
       print('Error sending encrypted offer status updates: $e');
     }
@@ -209,7 +227,8 @@ class NostrService {
       );
 
       await _signer.sign(event);
-      await _ndk.broadcast.broadcast(nostrEvent: event, specificRelays: _relays);
+      await _ndk.broadcast
+          .broadcast(nostrEvent: event, specificRelays: _relays);
 
       // print(
       //     'Sent encrypted status update to $recipientPubkey for offer $offerId');
@@ -238,7 +257,8 @@ class NostrService {
         print('!!!!!!!!!!!!!! SHOULD RETRY subscription');
       });
 
-      print('Started listening for coordinator requests on kind $KIND_COORDINATOR_REQUEST');
+      print(
+          'Started listening for coordinator requests on kind $KIND_COORDINATOR_REQUEST');
     } catch (e) {
       print('Error starting request listener: $e');
     }
@@ -269,7 +289,8 @@ class NostrService {
     final id = request['id'] as String?;
 
     if (method == null || id == null) {
-      await _sendErrorResponse(event.pubKey, id, 'INVALID_REQUEST', 'Missing method or id');
+      await _sendErrorResponse(
+          event.pubKey, id, 'INVALID_REQUEST', 'Missing method or id');
       return;
     }
     try {
@@ -277,12 +298,14 @@ class NostrService {
       await _sendResponse(event.pubKey, id, response);
     } catch (e) {
       print('Error handling request: $e');
-      await _sendErrorResponse(event.pubKey, id, 'INTERNAL_ERROR', e.toString());
+      await _sendErrorResponse(
+          event.pubKey, id, 'INTERNAL_ERROR', e.toString());
     }
   }
 
   /// Process a coordinator request
-  Future<Map<String, dynamic>> _processRequest(String method, Map<String, dynamic> params, String userPubkey) async {
+  Future<Map<String, dynamic>> _processRequest(
+      String method, Map<String, dynamic> params, String userPubkey) async {
     try {
       switch (method) {
         case 'get_info':
@@ -311,32 +334,39 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final reservationTimestamp = await _coordinatorService.reserveOffer(offerId, userPubkey);
+          final reservationTimestamp =
+              await _coordinatorService.reserveOffer(offerId, userPubkey);
           if (reservationTimestamp != null) {
             return {
               'message': 'Offer reserved successfully',
               'reserved_at': reservationTimestamp.millisecondsSinceEpoch,
             };
           } else {
-            throw Exception('Failed to reserve offer. It might be unavailable or already reserved.');
+            throw Exception(
+                'Failed to reserve offer. It might be unavailable or already reserved.');
           }
 
         case 'submit_blik':
           final offerId = params['offer_id'] as String?;
           final blikCode = params['blik_code'] as String?;
-          final takerLightningAddress = params['taker_lightning_address'] as String?;
+          final takerLightningAddress =
+              params['taker_lightning_address'] as String?;
 
-          if (offerId == null || blikCode == null || takerLightningAddress == null) {
-            throw Exception('Missing required parameters: offer_id, blik_code, taker_lightning_address');
+          if (offerId == null ||
+              blikCode == null ||
+              takerLightningAddress == null) {
+            throw Exception(
+                'Missing required parameters: offer_id, blik_code, taker_lightning_address');
           }
 
-          final success =
-              await _coordinatorService.submitBlikCode(offerId, userPubkey, blikCode, takerLightningAddress);
+          final success = await _coordinatorService.submitBlikCode(
+              offerId, userPubkey, blikCode, takerLightningAddress);
 
           if (success) {
             return {'message': 'BLIK code submitted successfully'};
           } else {
-            throw Exception('Failed to submit BLIK code. Offer state might be invalid or taker mismatch.');
+            throw Exception(
+                'Failed to submit BLIK code. Offer state might be invalid or taker mismatch.');
           }
 
         case 'get_blik':
@@ -345,11 +375,13 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final blikCode = await _coordinatorService.getBlikCodeForMaker(offerId, userPubkey);
+          final blikCode = await _coordinatorService.getBlikCodeForMaker(
+              offerId, userPubkey);
           if (blikCode != null) {
             return {'blik_code': blikCode};
           } else {
-            throw Exception('BLIK code not found or not available for this offer/maker.');
+            throw Exception(
+                'BLIK code not found or not available for this offer/maker.');
           }
 
         case 'confirm_payment':
@@ -358,15 +390,20 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final success = await _coordinatorService.confirmMakerPayment(offerId, userPubkey);
+          final success = await _coordinatorService.confirmMakerPayment(
+              offerId, userPubkey);
           if (success) {
-            return {'message': 'Payment confirmed, invoice settled, taker paid.'};
+            return {
+              'message': 'Payment confirmed, invoice settled, taker paid.'
+            };
           } else {
-            throw Exception('Failed to confirm payment. Check offer state, LND connection, or logs.');
+            throw Exception(
+                'Failed to confirm payment. Check offer state, LND connection, or logs.');
           }
 
         case 'get_my_active_offer':
-          final activeOffers = await _coordinatorService.getMyActiveOffers(userPubkey);
+          final activeOffers =
+              await _coordinatorService.getMyActiveOffers(userPubkey);
           if (activeOffers.isNotEmpty) {
             final offer = activeOffers.first;
             return offer.toJsonWithPubkeys();
@@ -375,15 +412,19 @@ class NostrService {
           }
 
         case 'get_my_finished_offers':
-          final activeOffers = await _coordinatorService.getMyActiveOffers(userPubkey);
+          final activeOffers =
+              await _coordinatorService.getMyActiveOffers(userPubkey);
           final now = DateTime.now().toUtc();
           final finished = activeOffers
               .where((offer) =>
-                  offer.status.name != 'expired' && offer.status.name != 'cancelled' ||
-                  offer.takerPaidAt != null && now.difference(offer.takerPaidAt!.toUtc()).inHours < 24)
+                  offer.status.name != 'expired' &&
+                      offer.status.name != 'cancelled' ||
+                  offer.takerPaidAt != null &&
+                      now.difference(offer.takerPaidAt!.toUtc()).inHours < 24)
               .toList();
 
-          final finishedList = finished.map((offer) => offer.toJsonWithPubkeys()).toList();
+          final finishedList =
+              finished.map((offer) => offer.toJsonWithPubkeys()).toList();
           return {'offers': finishedList};
 
         case 'cancel_offer':
@@ -393,11 +434,13 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final success = await _coordinatorService.cancelOffer(offerId, userPubkey);
+          final success =
+              await _coordinatorService.cancelOffer(offerId, userPubkey);
           if (success) {
             return {'message': 'Offer cancelled successfully'};
           } else {
-            throw Exception('Failed to cancel offer. It might be in the wrong state or you are not the maker.');
+            throw Exception(
+                'Failed to cancel offer. It might be in the wrong state or you are not the maker.');
           }
 
         case 'cancel_reservation':
@@ -406,11 +449,13 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final success = await _coordinatorService.cancelReservation(offerId, userPubkey);
+          final success =
+              await _coordinatorService.cancelReservation(offerId, userPubkey);
           if (success) {
             return {'message': 'Reservation cancelled successfully'};
           } else {
-            throw Exception('Failed to cancel reservation. It might be in the wrong state or you are not the taker.');
+            throw Exception(
+                'Failed to cancel reservation. It might be in the wrong state or you are not the taker.');
           }
 
         case 'mark_blik_invalid':
@@ -419,7 +464,8 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final success = await _coordinatorService.markBlikInvalid(offerId, userPubkey);
+          final success =
+              await _coordinatorService.markBlikInvalid(offerId, userPubkey);
           if (success) {
             return {'message': 'BLIK code marked as invalid successfully'};
           } else {
@@ -433,7 +479,8 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final success = await _coordinatorService.markBlikCharged(offerId, userPubkey);
+          final success =
+              await _coordinatorService.markBlikCharged(offerId, userPubkey);
           if (success) {
             return {'message': 'Offer marked as conflict successfully'};
           } else {
@@ -447,7 +494,8 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final success = await _coordinatorService.openDispute(offerId, userPubkey);
+          final success =
+              await _coordinatorService.openDispute(offerId, userPubkey);
           if (success) {
             return {'message': 'Offer marked as open dispute successfully'};
           } else {
@@ -463,7 +511,8 @@ class NostrService {
             throw Exception('Missing required parameters: offer_id, bolt11');
           }
 
-          final success = await _coordinatorService.updateTakerInvoice(offerId, bolt11, userPubkey);
+          final success = await _coordinatorService.updateTakerInvoice(
+              offerId, bolt11, userPubkey);
           if (success) {
             return {'message': 'Taker invoice updated'};
           } else {
@@ -476,7 +525,8 @@ class NostrService {
             throw Exception('Missing required parameter: offer_id');
           }
 
-          final error = await _coordinatorService.retryTakerPayment(offerId, userPubkey);
+          final error =
+              await _coordinatorService.retryTakerPayment(offerId, userPubkey);
           if (error == null) {
             return {'message': 'Taker payment retried'};
           } else {
@@ -495,7 +545,8 @@ class NostrService {
   }
 
   /// Send a successful response
-  Future<void> _sendResponse(String recipientPubkey, String requestId, Map<String, dynamic> result) async {
+  Future<void> _sendResponse(String recipientPubkey, String requestId,
+      Map<String, dynamic> result) async {
     try {
       final response = {
         'id': requestId,
@@ -509,8 +560,8 @@ class NostrService {
   }
 
   /// Send an error response
-  Future<void> _sendErrorResponse(
-      String recipientPubkey, String? requestId, String errorCode, String errorMessage) async {
+  Future<void> _sendErrorResponse(String recipientPubkey, String? requestId,
+      String errorCode, String errorMessage) async {
     try {
       final response = {
         'id': requestId,
@@ -527,7 +578,8 @@ class NostrService {
   }
 
   /// Send an encrypted message to a recipient
-  Future<void> _sendEncryptedMessage(String recipientPubkey, Map<String, dynamic> message) async {
+  Future<void> _sendEncryptedMessage(
+      String recipientPubkey, Map<String, dynamic> message) async {
     try {
       final messageJson = jsonEncode(message);
 
@@ -554,7 +606,8 @@ class NostrService {
       );
 
       await _signer.sign(event);
-      await _ndk.broadcast.broadcast(nostrEvent: event, specificRelays: _relays);
+      await _ndk.broadcast
+          .broadcast(nostrEvent: event, specificRelays: _relays);
 
       print('Sent encrypted response to $recipientPubkey');
     } catch (e) {
@@ -624,10 +677,24 @@ class NostrService {
         if (expiration != null) ['expiration', expiration.toString()],
         ['y', platform],
         ['z', document],
-        ['reserved_at', offer.reservedAt != null ? (offer.reservedAt!.millisecondsSinceEpoch ~/ 1000).toString() : ''],
-        ['created_at', (offer.createdAt.millisecondsSinceEpoch ~/ 1000).toString()],
-        ['paid_at', offer.takerPaidAt != null ? (offer.takerPaidAt!.millisecondsSinceEpoch ~/ 1000).toString() : ''],
-        if (offer.takerFees != null && offer.takerFees! > 0) ['taker_fees', offer.takerFees.toString()],
+        [
+          'reserved_at',
+          offer.reservedAt != null
+              ? (offer.reservedAt!.millisecondsSinceEpoch ~/ 1000).toString()
+              : ''
+        ],
+        [
+          'created_at',
+          (offer.createdAt.millisecondsSinceEpoch ~/ 1000).toString()
+        ],
+        [
+          'paid_at',
+          offer.takerPaidAt != null
+              ? (offer.takerPaidAt!.millisecondsSinceEpoch ~/ 1000).toString()
+              : ''
+        ],
+        if (offer.takerFees != null && offer.takerFees! > 0)
+          ['taker_fees', offer.takerFees.toString()],
         if (offer.makerFees > 0) ['maker_fees', offer.makerFees.toString()],
       ];
 
@@ -639,8 +706,10 @@ class NostrService {
         createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );
 
-      await _ndk.broadcast.broadcast(nostrEvent: event, customSigner: _signer, specificRelays: _relays);
-      print('Broadcasted NIP-69 order event for offer ${offer.id}, status: ${status} id:${event.id}');
+      await _ndk.broadcast.broadcast(
+          nostrEvent: event, customSigner: _signer, specificRelays: _relays);
+      print(
+          'Broadcasted NIP-69 order event for offer ${offer.id}, status: ${status} id:${event.id}');
     } catch (e) {
       print('Error broadcasting NIP-69 order event for offer ${offer.id}: $e');
     }
@@ -654,7 +723,8 @@ class NostrService {
       for (final offer in offers) {
         // final status = _mapOfferStatusToNip69Status(offer.status);
 
-        print('Rebroadcasting offer ${offer.id} with status ${offer.status.name}');
+        print(
+            'Rebroadcasting offer ${offer.id} with status ${offer.status.name}');
         // Calculate expiration if the offer is still active
         int? expiration;
         if (offer.status == OfferStatus.funded) {
