@@ -30,31 +30,29 @@ RUN cd /root/.pub-cache/hosted/pub.dev/ndk_rust_verifier-*/rust_builder/rust && 
 # Ensure your main entrypoint is bin/server.dart
 RUN APP_VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}') && \
     dart compile exe bin/server.dart -o bin/server --define=APP_VERSION=$APP_VERSION
-# Build minimal serving image from AOT-compiled `/server` and required system
-# libraries and configuration files stored in `/runtime/` from the build stage.
-
-#FROM scratch
+# Build minimal serving image - Alpine with glibc compatibility
 FROM alpine:latest
-RUN apk add --no-cache zlib
-RUN apk add --no-cache gmp
-RUN apk add signal-cli=0.13.22-r0
 
-RUN apk add --no-cache sqlite-libs libstdc++ libgcc
+# Install glibc compatibility layer for running Dart binaries compiled on Debian
+RUN apk add --no-cache \
+    gcompat \
+    libstdc++ \
+    sqlite-libs \
+    zlib \
+    gmp \
+    ca-certificates
 
-# Create symlinks for compatibility
-RUN ln -s /usr/lib/libsqlite3.so.0 /usr/lib/libsqlite3.so
+# signal-cli if needed
+RUN apk add signal-cli=0.13.22-r0 || true
+
+# Create symlink for sqlite
+RUN ln -sf /usr/lib/libsqlite3.so.0 /usr/lib/libsqlite3.so
 
 COPY --from=build /app/bin/server /app/bin/
 COPY --from=build /app/simplex-chat /app/
 
 # Copy the ndk_rust_verifier native library
 COPY --from=build /usr/local/lib/librust_lib_ndk.so /usr/local/lib/
-
-
-# Copy any necessary assets like .env files or certificates if needed
-# COPY .env .env
-# COPY tls.cert /app/tls.cert
-# COPY admin.macaroon /app/admin.macaroon
 
 WORKDIR /app
 
