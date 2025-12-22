@@ -1,25 +1,23 @@
-# Use the official Dart image.
 FROM dart:3.10.4-sdk AS build
 
 WORKDIR /app
 
-# Copy the rest of the application code.
 COPY . .
-RUN apt-get update && apt-get install -y wget
+RUN apt-get update && apt-get install -y wget curl build-essential
 RUN wget https://github.com/simplex-chat/simplex-chat/releases/download/v6.4.0/simplex-chat-ubuntu-22_04-x86-64
 RUN mv simplex-chat-ubuntu-22_04-x86-64 /app/simplex-chat
 RUN chmod +x /app/simplex-chat
 
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
 RUN dart pub get
 
-# Compile the server executable.
-# Ensure your main entrypoint is bin/server.dart
 RUN APP_VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}') && \
-    dart compile exe bin/server.dart -o bin/server --define=APP_VERSION=$APP_VERSION
-# Build minimal serving image from AOT-compiled `/server` and required system
-# libraries and configuration files stored in `/runtime/` from the build stage.
+    dart build cli -t bin/server.dart -o bin/server
+RUN ls -la bin/
 
-#FROM scratch
+#######################################################
 FROM alpine:latest
 RUN apk add --no-cache zlib
 RUN apk add --no-cache gmp
@@ -30,18 +28,11 @@ RUN ln -s /usr/lib/libsqlite3.so.0 /usr/lib/libsqlite3.so
 
 COPY --from=build /runtime/ /
 COPY --from=build /app/bin/server /app/bin/
+RUN ls -la /app/bin/
 COPY --from=build /app/simplex-chat /app/
-
-
-# Copy any necessary assets like .env files or certificates if needed
-# COPY .env .env
-# COPY tls.cert /app/tls.cert
-# COPY admin.macaroon /app/admin.macaroon
 
 WORKDIR /app
 
-# Expose the port the server listens on.
 EXPOSE 8080
 
-# Run the executable.
-CMD ["/app/bin/server"]
+CMD ["/app/bin/bundle/bin/server"]
