@@ -377,14 +377,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.4"
-  hex:
-    dependency: transitive
-    description:
-      name: hex
-      sha256: "4e7cd54e4b59ba026432a6be2dd9d96e4c5205725194997193bf871703b82c4a"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.0"
   html:
     dependency: transitive
     description:
@@ -548,11 +540,12 @@ packages:
   ndk:
     dependency: "direct main"
     description:
-      name: ndk
-      sha256: a417482a369606326d695cf0f555aebc07fd07faf81b692f106b9780e3326441
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.6.0-dev.10"
+      path: "packages/ndk"
+      ref: "106de0418e3435c482a79380ec4de9daf1a4e108"
+      resolved-ref: "106de0418e3435c482a79380ec4de9daf1a4e108"
+      url: "https://github.com/relaystr/ndk.git"
+    source: git
+    version: "0.6.1-dev.4"
   node_preamble:
     dependency: transitive
     description:
