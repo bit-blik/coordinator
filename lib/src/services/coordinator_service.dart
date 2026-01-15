@@ -1396,7 +1396,9 @@ class CoordinatorService {
         offer.makerPubkey != makerId ||
         (offer.status != OfferStatus.conflict && // Allow confirmation from conflict state
             offer.status != OfferStatus.takerCharged && // Allow confirmation from takerCharged state
-            offer.status != OfferStatus.blikSentToMaker)) {
+            offer.status != OfferStatus.blikSentToMaker && // Allow confirmation from blikSentToMaker state
+            offer.status != OfferStatus.expiredSentBlik // Allow confirmation from expiredSentBlik state
+        )) {
       print(
           'Offer $offerId not found, maker mismatch, or not in correct state for confirmation (current: ${offer?.status}).');
       return false;
