@@ -1,0 +1,370 @@
+import React, { useState, useEffect } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Calendar, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
+import './App.css';
+
+const OffersDashboard = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [groupBy, setGroupBy] = useState('daily');
+
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Build SQL query based on grouping
+        let dateGrouping;
+        let dateFormat;
+
+        switch(groupBy) {
+          case 'daily':
+            dateGrouping = "DATE(created_at)";
+            dateFormat = "YYYY-MM-DD";
+            break;
+          case 'weekly':
+            dateGrouping = "DATE_TRUNC('week', created_at)";
+            dateFormat = "IYYY-\"W\"IW";
+            break;
+          case 'monthly':
+            dateGrouping = "DATE_TRUNC('month', created_at)";
+            dateFormat = "YYYY-MM";
+            break;
+          default:
+            dateGrouping = "DATE(created_at)";
+            dateFormat = "YYYY-MM-DD";
+        }
+
+        const query = `
+          SELECT
+            TO_CHAR(${dateGrouping}, '${dateFormat}') AS date,
+            ROUND(
+              100 - (
+                CAST(COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled')) AS NUMERIC) /
+                NULLIF(CAST(COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled', 'takerPaid')) AS NUMERIC), 0)
+              ) * 100,
+              2
+            ) AS success_percentage,
+            COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled')) AS failed,
+            COUNT(*) FILTER (WHERE status = 'takerPaid') AS success,
+            COALESCE(SUM(maker_fees + taker_fees - taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0) AS profit,
+            COALESCE(SUM(fiat_amount) FILTER (WHERE status = 'takerPaid'), 0) AS volume,
+            COALESCE(SUM(amount_sats) FILTER (WHERE status = 'takerPaid'), 0) AS volume_sats,
+            COUNT(*) FILTER (WHERE status = 'takerPaid') AS success_count,
+            TO_CHAR(AVG(blik_received_at - created_at) FILTER (WHERE status = 'takerPaid' AND blik_code != '418145'), 'MI:SS') AS avg_received_blik,
+            TO_CHAR(AVG(taker_paid_at - created_at) FILTER (WHERE blik_code != '418145' AND status = 'takerPaid'), 'MI:SS') AS avg_total
+          FROM offers
+          GROUP BY ${dateGrouping}
+          ORDER BY ${dateGrouping} ASC
+          LIMIT 90
+        `;
+
+        const response = await fetch('http://localhost:3001/api/offers-data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        setData(result.rows || []);
+      } catch (err) {
+        setError(err.message);
+        console.error('Error fetching data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [groupBy]);
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pl-PL', {
+      style: 'currency',
+      currency: 'PLN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatNumber = (value) => {
+    return new Intl.NumberFormat('en-US').format(value);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-600 mt-0.5 flex-shrink-0" size={24} />
+            <div>
+              <h3 className="text-red-800 font-semibold mb-2">Failed to load data</h3>
+              <p className="text-red-700 text-sm mb-3">{error}</p>
+              <p className="text-red-600 text-xs">Make sure the API server is running on http://localhost:3001</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const stats = data.length > 0 ? {
+    totalVolume: data.reduce((sum, d) => sum + parseFloat(d.volume || 0), 0),
+    totalProfit: data.reduce((sum, d) => sum + parseFloat(d.profit || 0), 0),
+    avgSuccess: data.reduce((sum, d) => sum + parseFloat(d.success_percentage || 0), 0) / data.length,
+    totalSuccess: data.reduce((sum, d) => sum + parseInt(d.success || 0), 0),
+    totalFailed: data.reduce((sum, d) => sum + parseInt(d.failed || 0), 0),
+  } : {};
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Compact Header with Title and Time Filter */}
+        <div className="mb-6 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-3xl opacity-10"></div>
+          <div className="relative backdrop-blur-sm bg-white/80 rounded-2xl shadow-xl border border-white/20 p-6">
+            <div className="flex items-center justify-between gap-6 flex-wrap">
+              <div className="flex-1 min-w-[300px]">
+                <h1 className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-1">
+                  Offers Analytics Dashboard
+                </h1>
+                <p className="text-gray-600 text-sm flex items-center gap-2">
+                  <TrendingUp size={16} className="text-blue-600" />
+                  Real-time performance metrics
+                </p>
+              </div>
+              
+              {/* Compact Time Period Filter */}
+              <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl px-4 py-3 border border-blue-100">
+                <Calendar size={18} className="text-blue-600" />
+                <div className="flex gap-2">
+                  {['daily', 'weekly', 'monthly'].map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => setGroupBy(period)}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-300 ${
+                        groupBy === period
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {data.length === 0 ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+            <AlertCircle className="text-yellow-600 mx-auto mb-3" size={32} />
+            <p className="text-yellow-800 font-medium">No data available</p>
+            <p className="text-yellow-700 text-sm mt-1">There are no offers matching the selected criteria.</p>
+          </div>
+        ) : (
+          <>
+            {/* Compact Stats Row - Using Horizontal Space Efficiently */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {/* Total Volume Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-green-100 hover:border-green-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-emerald-400 to-green-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <DollarSign className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-green-800 uppercase tracking-wide mb-1">Volume</p>
+                      <p className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent truncate">
+                        {formatCurrency(stats.totalVolume)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-emerald-400 to-green-600 rounded-full"></div>
+                </div>
+              </div>
+
+              {/* Total Profit Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-blue-100 hover:border-blue-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-blue-400 to-indigo-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <TrendingUp className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1">Profit</p>
+                      <p className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate">
+                        {stats.totalProfit}
+                      </p>
+                      <p className="text-xs font-medium text-blue-600">sats</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-blue-400 to-indigo-600 rounded-full"></div>
+                </div>
+              </div>
+
+              {/* Avg Success Rate Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-400 to-pink-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-purple-100 hover:border-purple-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-purple-400 to-pink-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <TrendingUp className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-purple-800 uppercase tracking-wide mb-1">Success Rate</p>
+                      <p className="text-2xl font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        {stats.avgSuccess?.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-purple-400 to-pink-600 rounded-full"></div>
+                </div>
+              </div>
+
+              {/* Success/Failed Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-orange-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-orange-100 hover:border-orange-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-amber-400 to-orange-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <Calendar className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-orange-800 uppercase tracking-wide mb-1">Success/Failed</p>
+                      <p className="text-2xl font-extrabold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                        {formatNumber(stats.totalSuccess)}/{formatNumber(stats.totalFailed)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-amber-400 to-orange-600 rounded-full"></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-purple-500"></div>
+                  Success Rate Trend
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis domain={[0, 100]} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="success_percentage" stroke="#8b5cf6" strokeWidth={2} name="Success %" dot={{ fill: '#8b5cf6', r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                  Volume (PLN)
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Bar dataKey="volume" fill="#10b981" name="Volume" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                  Success vs Failed Offers
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Bar dataKey="success" fill="#3b82f6" name="Success" />
+                    <Bar dataKey="failed" fill="#ef4444" name="Failed" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-amber-500"></div>
+                  Profit Trend
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip formatter={(value) => formatNumber(value) + ' sats'} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="profit" stroke="#f59e0b" strokeWidth={2} name="Profit" dot={{ fill: '#f59e0b', r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-orange-500"></div>
+                Volume in Satoshis
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                  <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                  <Tooltip formatter={(value) => formatNumber(value) + ' sats'} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                  <Legend />
+                  <Bar dataKey="volume_sats" fill="#f97316" name="Volume (sats)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default OffersDashboard;

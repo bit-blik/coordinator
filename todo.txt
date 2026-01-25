@@ -2,10 +2,17 @@ Error: Cannot start taker charged timer for offer 0218d39b-ca42-47b7-8a3e-2aca38
 
 
 === CRITICAL BUGS
+- !!!! should not be able to cancel offer if not sure it didn't got created (paid invoice NWC) in coordinator, otherwise client looses access to it.
 - !!!! cannot get info from coordinator on saunter's ios
 - !!!! loses the created offer after payment???
 - !! settle maker invoice after 1 hour even if not confirmed so that we can resolve conflict having the sats
 - !! refresh (pull-down) offers list does not work
+- !!
+     LNURL Error: Step 2 request failed (500) for laura@fmar.dev: {"reason":"Invoice error: timeout","status":"ERROR"}
+    test-coordinator  | Could not get an invoice for net amount 30 sats for LN address laura@fmar.dev
+
+    should better show UI error of invalid LNURL instead of timeout
+
 - ! pay in wallet on browser when no webln available should launch lightning:// with choice of wallet apps
 - ! in progress offers should be listed in offer list with that in progress (reserved), timer
 - /create on web doesn't see the status update - websocket/relay disconnect/reconnect WTF?
