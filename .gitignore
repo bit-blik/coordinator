@@ -21,3 +21,5 @@ admin.macaroon
 /bin/server.exe
 /docker-compose.yml
 /signal/
+/dashboard/.env
+/dashboard/node_modules/

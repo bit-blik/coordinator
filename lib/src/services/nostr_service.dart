@@ -132,7 +132,7 @@ class NostrService {
       await _signer.sign(event);
       await _ndk.broadcast.broadcast(nostrEvent: event, specificRelays: _relays);
 
-      print('Published coordinator info event: ${event.id}');
+      print('Published coordinator info event for pub key: ${event.pubKey} to relays: $_relays');
     } catch (e) {
       print('Error publishing coordinator info: $e');
     }
