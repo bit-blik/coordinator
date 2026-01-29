@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Calendar, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
+import { Calendar, TrendingUp, DollarSign, AlertCircle, Clock } from 'lucide-react';
 import './App.css';
 
 const OffersDashboard = () => {
@@ -16,58 +16,13 @@ const OffersDashboard = () => {
       setError(null);
 
       try {
-        // Build SQL query based on grouping
-        let dateGrouping;
-        let dateFormat;
-
-        switch(groupBy) {
-          case 'daily':
-            dateGrouping = "DATE(created_at)";
-            dateFormat = "YYYY-MM-DD";
-            break;
-          case 'weekly':
-            dateGrouping = "DATE_TRUNC('week', created_at)";
-            dateFormat = "IYYY-\"W\"IW";
-            break;
-          case 'monthly':
-            dateGrouping = "DATE_TRUNC('month', created_at)";
-            dateFormat = "YYYY-MM";
-            break;
-          default:
-            dateGrouping = "DATE(created_at)";
-            dateFormat = "YYYY-MM-DD";
-        }
-
-        const query = `
-          SELECT
-            TO_CHAR(${dateGrouping}, '${dateFormat}') AS date,
-            ROUND(
-              100 - (
-                CAST(COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled')) AS NUMERIC) /
-                NULLIF(CAST(COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled', 'takerPaid')) AS NUMERIC), 0)
-              ) * 100,
-              2
-            ) AS success_percentage,
-            COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled')) AS failed,
-            COUNT(*) FILTER (WHERE status = 'takerPaid') AS success,
-            COALESCE(SUM(maker_fees + taker_fees - taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0) AS profit,
-            COALESCE(SUM(fiat_amount) FILTER (WHERE status = 'takerPaid'), 0) AS volume,
-            COALESCE(SUM(amount_sats) FILTER (WHERE status = 'takerPaid'), 0) AS volume_sats,
-            COUNT(*) FILTER (WHERE status = 'takerPaid') AS success_count,
-            TO_CHAR(AVG(blik_received_at - created_at) FILTER (WHERE status = 'takerPaid' AND blik_code != '418145'), 'MI:SS') AS avg_received_blik,
-            TO_CHAR(AVG(taker_paid_at - created_at) FILTER (WHERE blik_code != '418145' AND status = 'takerPaid'), 'MI:SS') AS avg_total
-          FROM offers
-          GROUP BY ${dateGrouping}
-          ORDER BY ${dateGrouping} ASC
-          LIMIT 90
-        `;
-
+        // Send only the groupBy parameter - backend handles SQL construction
         const response = await fetch('http://localhost:3001/api/offers-data', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ query })
+          body: JSON.stringify({ groupBy })
         });
 
         if (!response.ok) {
@@ -98,6 +53,13 @@ const OffersDashboard = () => {
 
   const formatNumber = (value) => {
     return new Intl.NumberFormat('en-US').format(value);
+  };
+
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -140,6 +102,8 @@ const OffersDashboard = () => {
     avgSuccess: data.reduce((sum, d) => sum + parseFloat(d.success_percentage || 0), 0) / data.length,
     totalSuccess: data.reduce((sum, d) => sum + parseInt(d.success || 0), 0),
     totalFailed: data.reduce((sum, d) => sum + parseInt(d.failed || 0), 0),
+    avgTimeToAccept: data.reduce((sum, d) => sum + parseFloat(d.avg_received_blik_seconds || 0), 0) / data.filter(d => d.avg_received_blik_seconds).length,
+    avgTimeToFullPayment: data.reduce((sum, d) => sum + parseFloat(d.avg_total_seconds || 0), 0) / data.filter(d => d.avg_total_seconds).length,
   } : {};
 
   return (
@@ -192,7 +156,7 @@ const OffersDashboard = () => {
         ) : (
           <>
             {/* Compact Stats Row - Using Horizontal Space Efficiently */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {/* Total Volume Card - Compact */}
               <div className="group relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
@@ -269,6 +233,44 @@ const OffersDashboard = () => {
                   <div className="mt-2 h-0.5 bg-gradient-to-r from-amber-400 to-orange-600 rounded-full"></div>
                 </div>
               </div>
+
+              {/* Time to Accept Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-cyan-100 hover:border-cyan-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-cyan-400 to-blue-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <Clock className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-cyan-800 uppercase tracking-wide mb-1">Time to Accept</p>
+                      <p className="text-2xl font-extrabold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                        {formatTime(stats.avgTimeToAccept)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-cyan-400 to-blue-600 rounded-full"></div>
+                </div>
+              </div>
+
+              {/* Time to Full Payment Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-teal-400 to-emerald-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-teal-100 hover:border-teal-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-teal-400 to-emerald-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <Clock className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-teal-800 uppercase tracking-wide mb-1">Time to Payment</p>
+                      <p className="text-2xl font-extrabold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                        {formatTime(stats.avgTimeToFullPayment)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-teal-400 to-emerald-600 rounded-full"></div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -339,6 +341,42 @@ const OffersDashboard = () => {
                     <Tooltip formatter={(value) => formatNumber(value) + ' sats'} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
                     <Legend />
                     <Line type="monotone" dataKey="profit" stroke="#f59e0b" strokeWidth={2} name="Profit" dot={{ fill: '#f59e0b', r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-cyan-500"></div>
+                  Time to Accept (BLIK Received)
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip formatter={(value) => formatTime(value)} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="avg_received_blik_seconds" stroke="#06b6d4" strokeWidth={2} name="Time to Accept" dot={{ fill: '#06b6d4', r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-teal-500"></div>
+                  Time to Full Payment
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip formatter={(value) => formatTime(value)} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="avg_total_seconds" stroke="#14b8a6" strokeWidth={2} name="Time to Payment" dot={{ fill: '#14b8a6', r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
