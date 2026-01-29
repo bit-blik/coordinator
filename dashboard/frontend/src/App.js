@@ -102,7 +102,7 @@ const OffersDashboard = () => {
     avgSuccess: data.reduce((sum, d) => sum + parseFloat(d.success_percentage || 0), 0) / data.length,
     totalSuccess: data.reduce((sum, d) => sum + parseInt(d.success || 0), 0),
     totalFailed: data.reduce((sum, d) => sum + parseInt(d.failed || 0), 0),
-    avgTimeToAccept: data.reduce((sum, d) => sum + parseFloat(d.avg_received_blik_seconds || 0), 0) / data.filter(d => d.avg_received_blik_seconds).length,
+    avgTimeToAccept: data.reduce((sum, d) => sum + parseFloat(d.avg_reserved_seconds || 0), 0) / data.filter(d => d.avg_reserved_seconds).length,
     avgTimeToFullPayment: data.reduce((sum, d) => sum + parseFloat(d.avg_total_seconds || 0), 0) / data.filter(d => d.avg_total_seconds).length,
   } : {};
 
@@ -350,7 +350,7 @@ const OffersDashboard = () => {
               <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-cyan-500"></div>
-                  Time to Accept (BLIK Received)
+                  Time to first Reservation
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={data}>
@@ -359,7 +359,7 @@ const OffersDashboard = () => {
                     <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
                     <Tooltip formatter={(value) => formatTime(value)} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
                     <Legend />
-                    <Line type="monotone" dataKey="avg_received_blik_seconds" stroke="#06b6d4" strokeWidth={2} name="Time to Accept" dot={{ fill: '#06b6d4', r: 4 }} />
+                    <Line type="monotone" dataKey="avg_reserved_seconds" stroke="#06b6d4" strokeWidth={2} name="Time to Accept" dot={{ fill: '#06b6d4', r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
