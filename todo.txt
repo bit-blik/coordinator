@@ -61,6 +61,7 @@ Error: Cannot start taker charged timer for offer 0218d39b-ca42-47b7-8a3e-2aca38
 === IMPROVEMENTS
 -!!! missing clock progress in make confirm blik (2min)
     - and after inform of 60m it will automatically be settled in taker's favor
+- taker after is not the first reservation but the last from reserved_at in stats and finished offers
 -!!! whitelist coordinators:
     - from bitblik followed list
     - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
