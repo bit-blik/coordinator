@@ -11,6 +11,7 @@ const OffersDashboard = () => {
   const [btcPlnRate, setBtcPlnRate] = useState(null);
   const [rateLoading, setRateLoading] = useState(true);
   const [rateError, setRateError] = useState(null);
+  const [lastRateFetchTime, setLastRateFetchTime] = useState(null);
 
   // Exchange rate sources configuration (matching coordinator)
   const exchangeRateSources = [
@@ -64,6 +65,7 @@ const OffersDashboard = () => {
       if (validRates.length > 0) {
         const averageRate = validRates.reduce((a, b) => a + b, 0) / validRates.length;
         setBtcPlnRate(averageRate);
+        setLastRateFetchTime(new Date());
         console.log(`Average BTC/PLN rate: ${averageRate} (from ${validRates.length} sources)`);
       } else {
         throw new Error('Failed to fetch BTC/PLN rate from all sources');
@@ -139,6 +141,14 @@ const OffersDashboard = () => {
     }).format(value);
   };
 
+  const formatRateTime = (date) => {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('pl-PL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  };
+
   const formatTime = (seconds) => {
     if (!seconds || isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
@@ -203,56 +213,56 @@ const OffersDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Compact Header with Title and Time Filter */}
-        <div className="mb-6 relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur-3xl opacity-10"></div>
-          <div className="relative backdrop-blur-sm bg-white/80 rounded-2xl shadow-xl border border-white/20 p-6">
-            <div className="flex items-center justify-between gap-6 flex-wrap">
-              <div className="flex-1 min-w-[300px]">
-                <h1 className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-1">
-                  Offers Analytics Dashboard
+        {/* Ultra-Compact Single-Line Header */}
+        <div className="mb-4 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg blur-2xl opacity-10"></div>
+          <div className="relative backdrop-blur-sm bg-white/80 rounded-lg shadow-lg border border-white/20 px-4 py-3">
+            <div className="flex items-center gap-3">
+              {/* Title - Ultra Compact */}
+              <div className="flex items-center gap-2">
+                <TrendingUp size={18} className="text-blue-600 flex-shrink-0" />
+                <h1 className="text-lg font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent whitespace-nowrap">
+                  Offers Analytics
                 </h1>
-                <p className="text-gray-600 text-sm flex items-center gap-2">
-                  <TrendingUp size={16} className="text-blue-600" />
-                  Real-time performance metrics
-                </p>
               </div>
               
-              {/* Rate Display */}
-              <div className="flex items-center gap-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl px-4 py-3 border border-amber-100">
-                <Bitcoin size={18} className="text-amber-600" />
-                <div className="text-sm">
-                  <span className="text-gray-600">BTC/PLN:</span>
-                  {rateLoading ? (
-                    <span className="ml-2 text-amber-600 animate-pulse">Loading...</span>
-                  ) : rateError ? (
-                    <span className="ml-2 text-red-500" title={rateError}>Error</span>
-                  ) : (
-                    <span className="ml-2 font-bold text-amber-700">
-                      {formatCurrency(btcPlnRate)}
-                    </span>
-                  )}
+              {/* Flexible Spacer */}
+              <div className="flex-1"></div>
+              
+              {/* BTC Rate - Inline */}
+              <div className="flex flex-col items-center bg-amber-50 rounded px-2.5 py-1.5 border border-amber-200">
+                <div className="flex items-center gap-1.5">
+                  <Bitcoin size={14} className="text-amber-600 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-amber-700 whitespace-nowrap">
+                    {rateLoading ? 'Loading...' : rateError ? 'Error' : formatCurrency(btcPlnRate)}
+                  </span>
                 </div>
+                {!rateLoading && !rateError && lastRateFetchTime && (
+                  <span className="text-[9px] text-amber-500/70 leading-none mt-0.5">
+                    {formatRateTime(lastRateFetchTime)}
+                  </span>
+                )}
               </div>
               
-              {/* Compact Time Period Filter */}
-              <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl px-4 py-3 border border-blue-100">
-                <Calendar size={18} className="text-blue-600" />
-                <div className="flex gap-2">
-                  {['daily', 'weekly', 'monthly'].map((period) => (
-                    <button
-                      key={period}
-                      onClick={() => setGroupBy(period)}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all duration-300 ${
-                        groupBy === period
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                      }`}
-                    >
-                      {period}
-                    </button>
-                  ))}
-                </div>
+              {/* Separator */}
+              <div className="h-6 w-px bg-gray-300"></div>
+              
+              {/* Period Selector - Compact Pills */}
+              <div className="flex items-center gap-1.5 bg-blue-50 rounded px-2.5 py-1.5 border border-blue-200">
+                <Calendar size={14} className="text-blue-600 flex-shrink-0" />
+                {['daily', 'weekly', 'monthly'].map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setGroupBy(period)}
+                    className={`px-2.5 py-1 rounded text-xs font-bold uppercase transition-all ${
+                      groupBy === period
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {period[0]}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -287,28 +297,32 @@ const OffersDashboard = () => {
                 </div>
               </div>
 
-              {/* Total Profit Card - Compact with PLN */}
+              {/* Total Profit Card - Horizontal Space Optimized */}
               <div className="group relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
-                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-blue-100 hover:border-blue-300 hover:-translate-y-1">
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-3 border border-blue-100 hover:border-blue-300 hover:-translate-y-1">
                   <div className="flex items-center gap-3">
                     <div className="bg-gradient-to-br from-blue-400 to-indigo-600 rounded-lg p-2 shadow-md flex-shrink-0">
-                      <TrendingUp className="text-white" size={18} />
+                      <TrendingUp className="text-white" size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1">Profit</p>
-                      <p className="text-xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate">
-                        {formatNumber(stats.totalProfitSats)}
-                      </p>
-                      <p className="text-xs font-medium text-blue-600">sats</p>
-                      {btcPlnRate && !rateLoading && (
-                        <p className="text-sm font-bold text-indigo-600 mt-1">
-                          ≈ {formatCurrency(totalProfitPln)}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-blue-800 uppercase tracking-wide">Profit</p>
+                        {btcPlnRate && !rateLoading && (
+                          <span className="text-xs font-semibold text-indigo-500">
+                            ≈ {formatCurrency(totalProfitPln)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="text-2xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate leading-tight">
+                          {formatNumber(stats.totalProfitSats)}
                         </p>
-                      )}
+                        <span className="text-sm font-medium text-blue-600">sats</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-2 h-0.5 bg-gradient-to-r from-blue-400 to-indigo-600 rounded-full"></div>
+                  <div className="mt-1.5 h-0.5 bg-gradient-to-r from-blue-400 to-indigo-600 rounded-full"></div>
                 </div>
               </div>
 
