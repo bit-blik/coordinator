@@ -88,7 +88,7 @@ app.post('/api/offers-data', async (req, res) => {
         COALESCE(SUM(amount_sats) FILTER (WHERE status = 'takerPaid'), 0) AS volume_sats,
         COUNT(*) FILTER (WHERE status = 'takerPaid') AS success_count,
         EXTRACT(EPOCH FROM AVG(reserved_at - created_at) FILTER (WHERE status = 'takerPaid')) AS avg_reserved_seconds,
-        EXTRACT(EPOCH FROM AVG(taker_paid_at - created_at) FILTER (WHERE status = 'takerPaid')) AS avg_total_seconds
+        EXTRACT(EPOCH FROM AVG(maker_confirmed_at - created_at) FILTER (WHERE status = 'takerPaid')) AS avg_total_seconds
       FROM offers
       GROUP BY ${dateGrouping}
       ORDER BY ${dateGrouping} ASC
