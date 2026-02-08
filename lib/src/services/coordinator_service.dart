@@ -983,8 +983,8 @@ class CoordinatorService {
     }
 
     // Read version from environment variable, with fallback to pubspec.yaml
-    const versionFromEnv = String.fromEnvironment('APP_VERSION');
-    if (versionFromEnv.isNotEmpty) {
+    final versionFromEnv = Platform.environment['APP_VERSION'];
+    if (versionFromEnv != null && versionFromEnv.isNotEmpty) {
       info['version'] = versionFromEnv;
     } else {
       try {
