@@ -13,12 +13,14 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN dart pub get
 
-RUN APP_VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}') && \
-    dart build cli -t bin/server.dart -o bin/server
-RUN ls -la bin/
+RUN dart build cli -t bin/server.dart -o bin/server
 
 #######################################################
 FROM alpine:latest
+
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION}
+
 RUN apk add --no-cache zlib
 RUN apk add --no-cache gmp
 #RUN apk add signal-cli=0.13.22-r0
