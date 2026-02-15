@@ -2,6 +2,7 @@ Error: Cannot start taker charged timer for offer 0218d39b-ca42-47b7-8a3e-2aca38
 
 
 === CRITICAL BUGS
+- !!!!! show active pending offer in main screen ABOVE the main buttons, since below it might be missed....1
 - !!!! calculate fee sum to include routing fees - needs pre-route estimation before creating invoice
 - !!!! status payingTaker is not shown to taker
 - !!! Brandkit ala https://github.com/getAlby/media  & https://getalby.com/brandkit (from figma)

@@ -71,7 +71,8 @@ app.post('/api/offers-data', async (req, res) => {
         break;
     }
 
-    const query = `
+    // Grouped data for charts (limited to recent periods)
+    const groupedQuery = `
       SELECT
         TO_CHAR(${dateGrouping}, '${dateFormat}') AS date,
         ROUND(
@@ -95,8 +96,35 @@ app.post('/api/offers-data', async (req, res) => {
       LIMIT 90
     `;
 
-    const result = await pool.query(query);
-    res.json({ rows: result.rows });
+    // Overall totals - same regardless of grouping
+    const totalsQuery = `
+      SELECT
+        COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled')) AS total_failed,
+        COUNT(*) FILTER (WHERE status = 'takerPaid') AS total_success,
+        COALESCE(SUM(maker_fees + taker_fees - taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0) AS total_profit,
+        COALESCE(SUM(fiat_amount) FILTER (WHERE status = 'takerPaid'), 0) AS total_volume,
+        COALESCE(SUM(amount_sats) FILTER (WHERE status = 'takerPaid'), 0) AS total_volume_sats,
+        ROUND(
+          100 - (
+            CAST(COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled')) AS NUMERIC) /
+            NULLIF(CAST(COUNT(*) FILTER (WHERE status IN ('expired', 'cancelled', 'takerPaid')) AS NUMERIC), 0)
+          ) * 100,
+          2
+        ) AS overall_success_percentage,
+        EXTRACT(EPOCH FROM AVG(reserved_at - created_at) FILTER (WHERE status = 'takerPaid')) AS overall_avg_reserved_seconds,
+        EXTRACT(EPOCH FROM AVG(maker_confirmed_at - created_at) FILTER (WHERE status = 'takerPaid')) AS overall_avg_total_seconds
+      FROM offers
+    `;
+
+    const [groupedResult, totalsResult] = await Promise.all([
+      pool.query(groupedQuery),
+      pool.query(totalsQuery)
+    ]);
+
+    res.json({ 
+      rows: groupedResult.rows,
+      totals: totalsResult.rows[0]
+    });
   } catch (error) {
     console.error('Database error:', error);
     res.status(500).json({ error: error.message });

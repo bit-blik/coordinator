@@ -1653,7 +1653,7 @@ class CoordinatorService {
         return 'No payment backend configured.';
       }
 
-      final feeLimitSat = offer.makerFees + 100;
+      final feeLimitSat = (offer.takerFees! * 0.2).ceil();
       print(
           ' Attempting to pay invoice for offer $offerId. Amount: $netAmountSats sats, Fee limit: $feeLimitSat sats.');
 
