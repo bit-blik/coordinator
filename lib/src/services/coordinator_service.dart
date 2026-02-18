@@ -27,6 +27,9 @@ import 'telegram_service.dart';
 // Set to Duration.zero for production
 const Duration _kDebugDelayDuration = Duration(seconds: 0);
 
+// Taker payment fee limit as a fraction of taker fees (0.2 = 20%)
+const double kTakerFeeLimitFactor = 0.2;
+
 class CoordinatorService {
   final DatabaseService _dbService;
   PaymentService? _paymentBackend; // Unified payment backend
@@ -1841,7 +1844,7 @@ class CoordinatorService {
         return 'No payment backend configured.';
       }
 
-      final feeLimitSat = (offer.takerFees! * 0.2).ceil();
+      final feeLimitSat = (offer.takerFees! * kTakerFeeLimitFactor).ceil();
       print(
           ' Attempting to pay invoice for offer $offerId. Amount: $netAmountSats sats, Fee limit: $feeLimitSat sats.');
 
