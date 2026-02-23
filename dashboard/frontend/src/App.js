@@ -6,6 +6,7 @@ import './App.css';
 const OffersDashboard = () => {
   const [data, setData] = useState([]);
   const [totals, setTotals] = useState(null);
+  const [takerDomainRanking, setTakerDomainRanking] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupBy, setGroupBy] = useState('daily');
@@ -110,6 +111,7 @@ const OffersDashboard = () => {
         const result = await response.json();
         setData(result.rows || []);
         setTotals(result.totals || null);
+        setTakerDomainRanking(result.takerDomainRanking || []);
       } catch (err) {
         setError(err.message);
         console.error('Error fetching data:', err);
@@ -208,6 +210,7 @@ const OffersDashboard = () => {
     avgTimeToAccept: parseFloat(totals.overall_avg_reserved_seconds || 0),
     avgTimeToFullPayment: parseFloat(totals.overall_avg_total_seconds || 0),
     avgTakerInvoiceFees: parseFloat(totals.overall_avg_taker_invoice_fees || 0),
+    takerFeesPercentage: parseFloat(totals.overall_taker_fees_percentage || 0),
   } : {};
 
   // Calculate profit in PLN
@@ -426,6 +429,25 @@ const OffersDashboard = () => {
                   <div className="mt-2 h-0.5 bg-gradient-to-r from-rose-400 to-pink-600 rounded-full"></div>
                 </div>
               </div>
+
+              {/* Taker Fees Percentage Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-400 to-purple-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-violet-100 hover:border-violet-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-violet-400 to-purple-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <TrendingUp className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-violet-800 uppercase tracking-wide mb-1">Fees % of Amount</p>
+                      <p className="text-2xl font-extrabold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                        {stats.takerFeesPercentage?.toFixed(2)}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-violet-400 to-purple-600 rounded-full"></div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -580,6 +602,42 @@ const OffersDashboard = () => {
                     <Legend />
                     <Line type="monotone" dataKey="avg_taker_invoice_fees" stroke="#f43f5e" strokeWidth={2} name="Avg Taker Invoice Fees" dot={{ fill: '#f43f5e', r: 4 }} />
                   </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-violet-500"></div>
+                  Taker Fees % of Amount Trend
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip formatter={(value) => `${value}%`} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="taker_fees_percentage" stroke="#8b5cf6" strokeWidth={2} name="Fees % of Amount" dot={{ fill: '#8b5cf6', r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-indigo-500"></div>
+                  Taker Domain Ranking (Total)
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={takerDomainRanking} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis dataKey="taker_domain" type="category" width={120} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                    <Tooltip formatter={(value) => `${value}%`} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Bar dataKey="avg_fees_percentage" fill="#6366f1" name="Avg Fees %" />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>

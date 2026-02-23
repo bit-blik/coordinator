@@ -4,12 +4,29 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+// Helper to strip surrounding quotes from env vars (handles both Docker and non-Docker environments)
+const stripQuotes = (value) => {
+  if (!value) return value;
+  const str = String(value).trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    return str.slice(1, -1);
+  }
+  return str;
+};
+
+// Strip quotes from env vars that might have them
+const dbPassword = stripQuotes(process.env.DB_PASSWORD);
+const dbHost = stripQuotes(process.env.DB_HOST);
+const dbPort = stripQuotes(process.env.DB_PORT);
+const dbName = stripQuotes(process.env.DB_NAME);
+const dbUser = stripQuotes(process.env.DB_USER);
+
 console.log('Database config:', {
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD ? '***hidden***' : 'NOT SET'
+  host: dbHost,
+  port: dbPort,
+  database: dbName,
+  user: dbUser,
+  password: dbPassword ? '***hidden***' : 'NOT SET'
 });
 
 const app = express();
@@ -28,8 +45,8 @@ app.use(express.static(path.join(__dirname, 'frontend/build')));
 //});
 
 // Build connection string with encoded password
-const password = encodeURIComponent(process.env.DB_PASSWORD);
-const connectionString = `postgresql://${process.env.DB_USER}:${password}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
+const password = encodeURIComponent(dbPassword);
+const connectionString = `postgresql://${dbUser}:${password}@${dbHost}:${dbPort}/${dbName}`;
 
 console.log('Attempting connection to database...');
 
@@ -90,7 +107,14 @@ app.post('/api/offers-data', async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'takerPaid') AS success_count,
         EXTRACT(EPOCH FROM AVG(reserved_at - created_at) FILTER (WHERE status = 'takerPaid')) AS avg_reserved_seconds,
         EXTRACT(EPOCH FROM AVG(maker_confirmed_at - created_at) FILTER (WHERE status = 'takerPaid')) AS avg_total_seconds,
-        ROUND(COALESCE(AVG(taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0), 2) AS avg_taker_invoice_fees
+        ROUND(COALESCE(AVG(taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0), 2) AS avg_taker_invoice_fees,
+        ROUND(
+          COALESCE(
+            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats, 0)) FILTER (WHERE status = 'takerPaid'),
+            0
+          ) * 100,
+          2
+        ) AS taker_fees_percentage
       FROM offers
       GROUP BY ${dateGrouping}
       ORDER BY ${dateGrouping} ASC
@@ -114,18 +138,47 @@ app.post('/api/offers-data', async (req, res) => {
         ) AS overall_success_percentage,
         EXTRACT(EPOCH FROM AVG(reserved_at - created_at) FILTER (WHERE status = 'takerPaid')) AS overall_avg_reserved_seconds,
         EXTRACT(EPOCH FROM AVG(maker_confirmed_at - created_at) FILTER (WHERE status = 'takerPaid')) AS overall_avg_total_seconds,
-        ROUND(COALESCE(AVG(taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0), 2) AS overall_avg_taker_invoice_fees
+        ROUND(COALESCE(AVG(taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0), 2) AS overall_avg_taker_invoice_fees,
+        ROUND(
+          COALESCE(
+            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats, 0)) FILTER (WHERE status = 'takerPaid'),
+            0
+          ) * 100,
+          2
+        ) AS overall_taker_fees_percentage
       FROM offers
     `;
 
-    const [groupedResult, totalsResult] = await Promise.all([
+    // Taker domain ranking - total, not affected by date filters
+    const takerDomainQuery = `
+      SELECT
+        SPLIT_PART(taker_lightning_address, '@', 2) AS taker_domain,
+        COUNT(*) AS offer_count,
+        ROUND(
+          COALESCE(
+            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats, 0)) FILTER (WHERE status = 'takerPaid'),
+            0
+          ) * 100,
+          2
+        ) AS avg_fees_percentage
+      FROM offers
+      WHERE status = 'takerPaid'
+        AND taker_lightning_address IS NOT NULL
+        AND taker_lightning_address LIKE '%@%'
+      GROUP BY SPLIT_PART(taker_lightning_address, '@', 2)
+      ORDER BY avg_fees_percentage DESC
+    `;
+
+    const [groupedResult, totalsResult, takerDomainResult] = await Promise.all([
       pool.query(groupedQuery),
-      pool.query(totalsQuery)
+      pool.query(totalsQuery),
+      pool.query(takerDomainQuery)
     ]);
 
     res.json({ 
       rows: groupedResult.rows,
-      totals: totalsResult.rows[0]
+      totals: totalsResult.rows[0],
+      takerDomainRanking: takerDomainResult.rows
     });
   } catch (error) {
     console.error('Database error:', error);
