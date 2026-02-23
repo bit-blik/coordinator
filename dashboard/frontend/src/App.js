@@ -5,6 +5,7 @@ import './App.css';
 
 const OffersDashboard = () => {
   const [data, setData] = useState([]);
+  const [totals, setTotals] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupBy, setGroupBy] = useState('daily');
@@ -108,6 +109,7 @@ const OffersDashboard = () => {
 
         const result = await response.json();
         setData(result.rows || []);
+        setTotals(result.totals || null);
       } catch (err) {
         setError(err.message);
         console.error('Error fetching data:', err);
@@ -197,14 +199,14 @@ const OffersDashboard = () => {
     );
   }
 
-  const stats = data.length > 0 ? {
-    totalVolume: data.reduce((sum, d) => sum + parseFloat(d.volume || 0), 0),
-    totalProfitSats: data.reduce((sum, d) => sum + parseFloat(d.profit || 0), 0),
-    avgSuccess: data.reduce((sum, d) => sum + parseFloat(d.success_percentage || 0), 0) / data.length,
-    totalSuccess: data.reduce((sum, d) => sum + parseInt(d.success || 0), 0),
-    totalFailed: data.reduce((sum, d) => sum + parseInt(d.failed || 0), 0),
-    avgTimeToAccept: data.reduce((sum, d) => sum + parseFloat(d.avg_reserved_seconds || 0), 0) / data.filter(d => d.avg_reserved_seconds).length,
-    avgTimeToFullPayment: data.reduce((sum, d) => sum + parseFloat(d.avg_total_seconds || 0), 0) / data.filter(d => d.avg_total_seconds).length,
+  const stats = totals ? {
+    totalVolume: parseFloat(totals.total_volume || 0),
+    totalProfitSats: parseFloat(totals.total_profit || 0),
+    avgSuccess: parseFloat(totals.overall_success_percentage || 0),
+    totalSuccess: parseInt(totals.total_success || 0),
+    totalFailed: parseInt(totals.total_failed || 0),
+    avgTimeToAccept: parseFloat(totals.overall_avg_reserved_seconds || 0),
+    avgTimeToFullPayment: parseFloat(totals.overall_avg_total_seconds || 0),
   } : {};
 
   // Calculate profit in PLN
@@ -268,7 +270,7 @@ const OffersDashboard = () => {
           </div>
         </div>
 
-        {data.length === 0 ? (
+        {!totals ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
             <AlertCircle className="text-yellow-600 mx-auto mb-3" size={32} />
             <p className="text-yellow-800 font-medium">No data available</p>
