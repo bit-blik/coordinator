@@ -207,6 +207,7 @@ const OffersDashboard = () => {
     totalFailed: parseInt(totals.total_failed || 0),
     avgTimeToAccept: parseFloat(totals.overall_avg_reserved_seconds || 0),
     avgTimeToFullPayment: parseFloat(totals.overall_avg_total_seconds || 0),
+    avgTakerInvoiceFees: parseFloat(totals.overall_avg_taker_invoice_fees || 0),
   } : {};
 
   // Calculate profit in PLN
@@ -279,7 +280,7 @@ const OffersDashboard = () => {
         ) : (
           <>
             {/* Compact Stats Row - Using Horizontal Space Efficiently */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {/* Total Volume Card - Compact */}
               <div className="group relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
@@ -401,6 +402,28 @@ const OffersDashboard = () => {
                     </div>
                   </div>
                   <div className="mt-2 h-0.5 bg-gradient-to-r from-teal-400 to-emerald-600 rounded-full"></div>
+                </div>
+              </div>
+
+              {/* Avg Taker Invoice Fees Card - Compact */}
+              <div className="group relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-rose-400 to-pink-600 rounded-xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+                <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-rose-100 hover:border-rose-300 hover:-translate-y-1">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-rose-400 to-pink-600 rounded-lg p-2 shadow-md flex-shrink-0">
+                      <DollarSign className="text-white" size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-rose-800 uppercase tracking-wide mb-1">Avg Taker Fees</p>
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="text-2xl font-extrabold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent truncate leading-tight">
+                          {formatNumber(stats.avgTakerInvoiceFees)}
+                        </p>
+                        <span className="text-sm font-medium text-rose-600">sats</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-0.5 bg-gradient-to-r from-rose-400 to-pink-600 rounded-full"></div>
                 </div>
               </div>
             </div>
@@ -525,21 +548,40 @@ const OffersDashboard = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-orange-500"></div>
-                Volume in Satoshis
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
-                  <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-                  <Tooltip formatter={(value) => formatNumber(value) + ' sats'} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
-                  <Legend />
-                  <Bar dataKey="volume_sats" fill="#f97316" name="Volume (sats)" />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-orange-500"></div>
+                  Volume in Satoshis
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip formatter={(value) => formatNumber(value) + ' sats'} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Bar dataKey="volume_sats" fill="#f97316" name="Volume (sats)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-rose-500"></div>
+                  Avg Taker Invoice Fees Trend
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={80} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip formatter={(value) => formatNumber(value) + ' sats'} contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="avg_taker_invoice_fees" stroke="#f43f5e" strokeWidth={2} name="Avg Taker Invoice Fees" dot={{ fill: '#f43f5e', r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </>
         )}
