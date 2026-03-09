@@ -89,6 +89,11 @@ app.post('/api/offers-data', async (req, res) => {
     }
 
     // Grouped data for charts (limited to recent periods)
+    // For daily view, restrict to last 30 days
+    const dateFilter = groupBy === 'daily' 
+      ? "WHERE created_at >= NOW() - INTERVAL '29 days'" 
+      : '';
+    
     const groupedQuery = `
       SELECT
         TO_CHAR(${dateGrouping}, '${dateFormat}') AS date,
@@ -116,6 +121,7 @@ app.post('/api/offers-data', async (req, res) => {
           2
         ) AS taker_fees_percentage
       FROM offers
+      ${dateFilter}
       GROUP BY ${dateGrouping}
       ORDER BY ${dateGrouping} ASC
       LIMIT 90
