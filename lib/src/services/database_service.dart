@@ -211,18 +211,19 @@ class DatabaseService {
       case OfferStatus.blikReceived:
         if (blikCode == null)
           throw ArgumentError('blikCode required for blikReceived status');
-        if (takerLightningAddress == null)
-          throw ArgumentError(
-              'takerLightningAddress required for blikReceived status');
         if (blikReceivedAt == null)
           throw ArgumentError(
               'blikReceivedAt required for blikReceived status'); // Ensure timestamp is passed
+        if (takerLightningAddress == null) {
+          setClauses.add('taker_lightning_address = NULL');
+        } else {
+          params['taker_lightning_address'] = takerLightningAddress;
+          setClauses.add('taker_lightning_address = @taker_lightning_address');
+        }
         params['blik_code'] = blikCode;
-        params['taker_lightning_address'] = takerLightningAddress;
         params['blik_received_at'] =
             blikReceivedAt.toUtc(); // Use passed timestamp
         setClauses.add('blik_code = @blik_code');
-        setClauses.add('taker_lightning_address = @taker_lightning_address');
         setClauses.add('blik_received_at = @blik_received_at');
         break;
       case OfferStatus.makerConfirmed:
@@ -252,6 +253,8 @@ class DatabaseService {
         setClauses.add('reserved_at = NULL');
         setClauses.add('blik_code = NULL');
         setClauses.add('taker_lightning_address = NULL');
+        setClauses.add('taker_invoice = NULL');
+        setClauses.add('taker_invoice_fees = NULL');
         setClauses.add('blik_received_at = NULL');
         break;
       case OfferStatus.invalidBlik: // Add case for invalidBlik
@@ -288,6 +291,8 @@ class DatabaseService {
              reserved_at = NULL,
              blik_code = NULL,
              taker_lightning_address = NULL,
+             taker_invoice = NULL,
+             taker_invoice_fees = NULL,
              blik_received_at = NULL
          WHERE id = @id
            AND maker_pubkey = @makerPubkey
@@ -347,7 +352,8 @@ class DatabaseService {
   Future<List<Offer>> getOffersFromLastHours() async {
     if (_connection == null) throw StateError('Database not connected.');
 
-    final twentyFourHoursAgo = DateTime.now().toUtc().subtract(Duration(hours: 12));
+    final twentyFourHoursAgo =
+        DateTime.now().toUtc().subtract(Duration(hours: 12));
 
     final results = await _connection!.query(
       '''

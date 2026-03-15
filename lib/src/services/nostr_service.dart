@@ -325,13 +325,14 @@ class NostrService {
           final offerId = params['offer_id'] as String?;
           final blikCode = params['blik_code'] as String?;
           final takerLightningAddress = params['taker_lightning_address'] as String?;
+          final taker_invoice = params['taker_invoice'] as String?;
 
-          if (offerId == null || blikCode == null || takerLightningAddress == null) {
+          if (offerId == null || blikCode == null || (takerLightningAddress == null && taker_invoice == null)) {
             throw Exception('Missing required parameters: offer_id, blik_code, taker_lightning_address');
           }
 
           final success =
-              await _coordinatorService.submitBlikCode(offerId, userPubkey, blikCode, takerLightningAddress);
+              await _coordinatorService.submitBlikCode(offerId, userPubkey, blikCode, takerLightningAddress, taker_invoice);
 
           if (success) {
             return {'message': 'BLIK code submitted successfully'};

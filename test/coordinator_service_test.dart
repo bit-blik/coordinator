@@ -10,8 +10,10 @@ import 'package:bitblik_coordinator/src/models/pay_invoice_result.dart'; // Adde
 import 'package:bitblik_coordinator/src/services/coordinator_service.dart';
 import 'package:bitblik_coordinator/src/services/database_service.dart';
 import 'package:bitblik_coordinator/src/services/payment_service.dart';
+import 'package:bolt11_decoder/bolt11_decoder.dart';
 // For MockClient if not using Mockito's for http
 import 'package:clock/clock.dart';
+import 'package:decimal/decimal.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:http/http.dart' as http;
 import 'package:mockito/annotations.dart';
@@ -158,6 +160,8 @@ void main() {
   const String testPreimage = 'test-preimage';
   const String testBlikCode = '123456';
   const String testTakerLnAddress = 'taker@example.com';
+  const String testValidTakerInvoice =
+      'lnbc15u1p3xnhl2pp5jptserfk3zk4qy42tlucycrfwxhydvlemu9pqr93tuzlv9cc7g3sdqsvfhkcap3xyhx7un8cqzpgxqzjcsp5f8c52y2stc300gl6s4xswtjpc37hrnnr3c9wvtgjfuvqmpm35evq9qyyssqy4lgd8tj637qcjp05rdpxxykjenthxftej7a2zzmwrmrl70fyj9hvj0rewhzj7jfyuwkwcg9g2jpwtk3wkjtwnkdks84hsnu8xps5vsq4gj5hs';
   const double testFiatAmount = 100.0;
   const int testSatsAmount = 200000;
   const int testMakerFees = 1000;
@@ -303,6 +307,10 @@ void main() {
     });
     // Add stub for cancelOffer
     when(mockDbService.cancelOffer(any, any)).thenAnswer((_) async => true);
+    when(mockDbService.updateTakerInvoice(any, any))
+        .thenAnswer((_) async => true);
+    when(mockDbService.updateTakerInvoiceFees(any, any))
+        .thenAnswer((_) async => true);
     when(mockPaymentService.createHoldInvoice(
             amountSats: anyNamed('amountSats'),
             memo: anyNamed('memo'),
@@ -1155,7 +1163,7 @@ void main() {
 
           // 2. Submit BLIK
           coordinatorService.submitBlikCode(
-              offerId, takerId, blikCode, takerLnAddr);
+              offerId, takerId, blikCode, takerLnAddr, null);
           async.flushMicrotasks();
           expect(currentOffer?.status, OfferStatus.blikReceived);
 
@@ -1391,7 +1399,7 @@ void main() {
 
         coordinatorService
             .submitBlikCode(offerIdForBlikTimeout, testTakerId, testBlikCode,
-                testTakerLnAddress)
+                testTakerLnAddress, null)
             .then((success) {
           expect(success, isTrue,
               reason: "submitBlikCode should succeed with mocked HTTP client");
@@ -1475,7 +1483,7 @@ void main() {
         // 2. Taker submits blik code
         coordinatorService
             .submitBlikCode(
-                offerId, testTakerId, testBlikCode, testTakerLnAddress)
+                offerId, testTakerId, testBlikCode, testTakerLnAddress, null)
             .then((success) {
           expect(success, isTrue, reason: "submitBlikCode should succeed");
         });
@@ -1573,7 +1581,7 @@ void main() {
         // 2. Taker submits blik code
         coordinatorService
             .submitBlikCode(
-                offerId, testTakerId, testBlikCode, testTakerLnAddress)
+                offerId, testTakerId, testBlikCode, testTakerLnAddress, null)
             .then((success) {
           expect(success, isTrue, reason: "submitBlikCode should succeed");
         });
@@ -1735,7 +1743,7 @@ void main() {
       // )).thenAnswer((_) async => http.Response(lnurlpCallbackResponse, 200));
 
       final result = await coordinatorService.submitBlikCode(
-          testOfferId, testTakerId, testBlikCode, testTakerLnAddress);
+          testOfferId, testTakerId, testBlikCode, testTakerLnAddress, null);
 
       expect(result, isTrue); // Expect true now that HTTP is mocked
       final captured = verify(mockDbService.updateOfferStatus(
@@ -1747,6 +1755,49 @@ void main() {
       )).captured;
       expect(captured.single, isA<DateTime>());
       // Assert reservation timer was cancelled and BLIK confirmation timer started. (Internal detail)
+    });
+
+    test(
+        'reserved --taker enters BLIK with taker_invoice only--> blkReceived and stores invoice',
+        () async {
+      final parsedInvoice = Bolt11PaymentRequest(testValidTakerInvoice);
+      final invoiceAmountSats =
+          (parsedInvoice.amount * Decimal.fromInt(100000000))
+              .toBigInt()
+              .toInt();
+      final offer = createTestOffer(
+        status: OfferStatus.reserved,
+        takerPubkey: testTakerId,
+        reservedAt: clock.now().toUtc().subtract(Duration(seconds: 5)),
+        takerFees: testTakerFees,
+        amountSats: invoiceAmountSats + testTakerFees,
+      );
+      when(mockDbService.getOfferById(testOfferId))
+          .thenAnswer((_) async => offer);
+
+      when(mockDbService.updateOfferStatus(
+        testOfferId,
+        OfferStatus.blikReceived,
+        blikCode: testBlikCode,
+        takerLightningAddress: null,
+        blikReceivedAt: anyNamed('blikReceivedAt'),
+      )).thenAnswer((_) async => true);
+
+      final result = await coordinatorService.submitBlikCode(
+          testOfferId, testTakerId, testBlikCode, null, testValidTakerInvoice);
+
+      expect(result, isTrue);
+      verify(mockDbService.updateTakerInvoice(
+              testOfferId, testValidTakerInvoice))
+          .called(1);
+      verifyNever(mockHttpClient.get(any));
+      verify(mockDbService.updateOfferStatus(
+        testOfferId,
+        OfferStatus.blikReceived,
+        blikCode: testBlikCode,
+        takerLightningAddress: null,
+        blikReceivedAt: anyNamed('blikReceivedAt'),
+      )).called(1);
     });
 
     test(
@@ -1846,6 +1897,74 @@ void main() {
               amountSat: offer.amountSats - (offer.takerFees ?? 0),
               feeLimitSat: expectedFeeLimit))
           .called(1);
+    });
+
+    test(
+        'blkSentToMaker --maker confirms using stored taker invoice only--> payingTaker -> takerPaid',
+        () async {
+      final parsedInvoice = Bolt11PaymentRequest(testValidTakerInvoice);
+      final invoiceAmountSats =
+          (parsedInvoice.amount * Decimal.fromInt(100000000))
+              .toBigInt()
+              .toInt();
+      final offer = createTestOffer(
+          status: OfferStatus.blikSentToMaker,
+          holdInvoicePreimage: testPreimage,
+          takerLightningAddress: null,
+          takerInvoice: testValidTakerInvoice,
+          amountSats: invoiceAmountSats + testTakerFees,
+          makerFees: testMakerFees,
+          takerFees: testTakerFees);
+      when(mockDbService.getOfferById(testOfferId))
+          .thenAnswer((_) async => offer);
+
+      when(mockDbService.updateOfferStatus(
+              testOfferId, OfferStatus.makerConfirmed))
+          .thenAnswer((_) async {
+        offer.status = OfferStatus.makerConfirmed;
+        return true;
+      });
+      when(mockDbService.updateOfferStatus(testOfferId, OfferStatus.settled))
+          .thenAnswer((_) async {
+        offer.status = OfferStatus.settled;
+        return true;
+      });
+      when(mockDbService.updateOfferStatus(
+              testOfferId, OfferStatus.payingTaker))
+          .thenAnswer((_) async {
+        offer.status = OfferStatus.payingTaker;
+        return true;
+      });
+      when(mockDbService.updateOfferStatus(testOfferId, OfferStatus.takerPaid,
+              takerFees: anyNamed('takerFees')))
+          .thenAnswer((_) async {
+        offer.status = OfferStatus.takerPaid;
+        return true;
+      });
+
+      when(mockPaymentService.settleInvoice(preimageHex: testPreimage))
+          .thenAnswer((_) async {});
+      when(mockPaymentService.payInvoice(
+              invoice: testValidTakerInvoice,
+              amountSat: anyNamed('amountSat'),
+              feeLimitSat: anyNamed('feeLimitSat')))
+          .thenAnswer((_) async => PayInvoiceResult(
+              paymentPreimage: 'taker_paid_preimage_invoice_only', feeSat: 4));
+
+      final result = await coordinatorService.confirmMakerPayment(
+          testOfferId, testMakerId);
+      expect(result, isTrue);
+
+      await untilCalled(mockDbService.updateOfferStatus(
+          testOfferId, OfferStatus.takerPaid,
+          takerFees: anyNamed('takerFees')));
+
+      verify(mockPaymentService.payInvoice(
+              invoice: testValidTakerInvoice,
+              amountSat: anyNamed('amountSat'),
+              feeLimitSat: anyNamed('feeLimitSat')))
+          .called(1);
+      verifyNever(mockHttpClient.get(any));
     });
 
     test('blkSentToMaker --maker marks as bad BLK--> invalidBlik', () async {
@@ -2149,7 +2268,7 @@ void main() {
           .thenAnswer((_) async => offer);
 
       final result = await coordinatorService.submitBlikCode(
-          testOfferId, wrongTakerId, testBlikCode, testTakerLnAddress);
+          testOfferId, wrongTakerId, testBlikCode, testTakerLnAddress, null);
 
       expect(result, isFalse);
       verifyNever(mockDbService.updateOfferStatus(
@@ -2261,7 +2380,7 @@ void main() {
           .thenAnswer((_) async => offer);
 
       final result = await coordinatorService.submitBlikCode(
-          testOfferId, testTakerId, testBlikCode, testTakerLnAddress);
+          testOfferId, testTakerId, testBlikCode, testTakerLnAddress, null);
 
       expect(result, isFalse);
       verifyNever(mockDbService.updateOfferStatus(

@@ -1,5 +1,3 @@
-Error: Cannot start taker charged timer for offer 0218d39b-ca42-47b7-8a3e-2aca38bd2696 without blikReceivedAt timestamp or not in state takerCharged, status is OfferStatus.expiredSentBlik blikReceivedAt: 2025-12-05 13:32:37.240359
-
 
 === CRITICAL BUGS
 - !!!!! show active pending offer in main screen ABOVE the main buttons, since below it might be missed....1

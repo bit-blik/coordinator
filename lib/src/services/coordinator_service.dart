@@ -13,6 +13,8 @@ import 'package:matrix/matrix.dart' as matrix; // Import Matrix SDK
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as path;
 import 'package:process_run/process_run.dart';
+import 'package:bolt11_decoder/bolt11_decoder.dart';
+import 'package:decimal/decimal.dart';
 
 import '../models/offer.dart';
 import 'database_service.dart';
@@ -1297,7 +1299,7 @@ class CoordinatorService {
   }
 
   Future<bool> submitBlikCode(String offerId, String takerId, String blikCode,
-      String takerLightningAddress) async {
+      String? takerLightningAddress, String? takerInvoice) async {
     print('Submitting BLIK $blikCode for offer $offerId by taker $takerId');
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
@@ -1313,8 +1315,29 @@ class CoordinatorService {
     print(
         'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: ${offer.takerFees})');
 
-    final takerInvoice =
-        await _resolveLnurlPay(takerLightningAddress, netAmountSats);
+    if (takerInvoice == null) {
+      if (takerLightningAddress == null || takerLightningAddress.isEmpty) {
+        print(
+            'Cannot resolve LNURL invoice for offer $offerId: missing takerLightningAddress and takerInvoice.');
+        return false;
+      }
+      takerInvoice =
+          await _resolveLnurlPay(takerLightningAddress, netAmountSats);
+    } else {
+      final req = Bolt11PaymentRequest(takerInvoice);
+      final invoiceAmountSats =
+          (req.amount * Decimal.fromInt(100000000)).toBigInt().toInt();
+      if (invoiceAmountSats > netAmountSats + 10) {
+        // Allow small rounding difference because of slight rate different between client/server
+        throw Exception(
+            'Provided taker invoice amount ${invoiceAmountSats} sats is greater than expected net amount $netAmountSats sats.');
+      }
+      if (invoiceAmountSats < netAmountSats - 100) {
+        // Allow small rounding difference because of slight rate different between client/server
+        throw Exception(
+            'Provided taker invoice amount ${invoiceAmountSats} sats is much smaller than expected net amount $netAmountSats sats.');
+      }
+    }
     if (takerInvoice == null || takerInvoice.isEmpty) {
       print(
           'Could not get an invoice for net amount $netAmountSats sats for LN address $takerLightningAddress');
@@ -1329,6 +1352,15 @@ class CoordinatorService {
         'Cancelled reservation timer for offer $offerId due to BLIK submission.');
 
     final blikReceivedTime = DateTime.now().toUtc();
+
+    final invoiceStored =
+        await _dbService.updateTakerInvoice(offerId, takerInvoice);
+    if (!invoiceStored) {
+      print(
+          'Failed to persist taker invoice for offer $offerId. Rejecting BLIK submission.');
+      return false;
+    }
+
     final success = await _dbService.updateOfferStatus(
         offerId, OfferStatus.blikReceived,
         blikCode: blikCode,
@@ -1760,30 +1792,17 @@ class CoordinatorService {
       return;
     }
 
-    if (offer.takerLightningAddress == null) {
-      print('Async Error: Taker Lightning Address missing for offer $offerId.');
-      await _dbService.updateOfferStatus(
-          offerId, OfferStatus.takerPaymentFailed);
-      final failedOffer = await _dbService.getOfferById(offerId);
-      if (failedOffer != null) {
-        await _publishStatusUpdate(failedOffer);
-      }
-      return;
-    }
-
     // Calculate net amount after taker fees
     final takerFees = (offer.amountSats * _takerFeePercentage / 100)
         .ceil(); // Use static field
     final netAmountSats = offer.amountSats - takerFees;
-    print(
-        'Async: Attempting to pay taker via LNURL: ${offer.takerLightningAddress} for net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
+    String? takerInvoice = offer.takerInvoice;
 
-    try {
-      final takerInvoice =
-          await _resolveLnurlPay(offer.takerLightningAddress!, netAmountSats);
-      if (takerInvoice == null) {
+    if (takerInvoice == null || takerInvoice.isEmpty) {
+      if (offer.takerLightningAddress == null ||
+          offer.takerLightningAddress!.isEmpty) {
         print(
-            'Async Error: Failed to resolve LNURL for net amount $netAmountSats for offer $offerId.');
+            'Async Error: Missing both taker invoice and Lightning Address for offer $offerId.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
         final failedOffer = await _dbService.getOfferById(offerId);
@@ -1793,13 +1812,36 @@ class CoordinatorService {
         return;
       }
 
-      bool invoiceStored =
-          await _dbService.updateTakerInvoice(offerId, takerInvoice);
-      if (!invoiceStored) {
-        print(
-            'Async Warning: Failed to store resolved taker invoice for offer $offerId. Proceeding with payment attempt.');
-      }
+      print(
+          'Async: No stored taker invoice. Attempting LNURL resolution for ${offer.takerLightningAddress} and net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
+    } else {
+      print(
+          'Async: Using stored taker invoice for offer $offerId and net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
+    }
 
+    try {
+      if (takerInvoice == null || takerInvoice.isEmpty) {
+        takerInvoice =
+            await _resolveLnurlPay(offer.takerLightningAddress!, netAmountSats);
+        if (takerInvoice == null || takerInvoice.isEmpty) {
+          print(
+              'Async Error: Failed to resolve LNURL for net amount $netAmountSats for offer $offerId.');
+          await _dbService.updateOfferStatus(
+              offerId, OfferStatus.takerPaymentFailed);
+          final failedOffer = await _dbService.getOfferById(offerId);
+          if (failedOffer != null) {
+            await _publishStatusUpdate(failedOffer);
+          }
+          return;
+        }
+
+        bool invoiceStored =
+            await _dbService.updateTakerInvoice(offerId, takerInvoice);
+        if (!invoiceStored) {
+          print(
+              'Async Warning: Failed to store resolved taker invoice for offer $offerId. Proceeding with payment attempt.');
+        }
+      }
       await _sendTakerPayment(offerId, takerInvoice);
     } catch (e) {
       print('Async Exception during taker payment for offer $offerId: $e');
