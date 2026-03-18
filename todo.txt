@@ -1,7 +1,6 @@
 
 === CRITICAL BUGS
-- !!!!! show active pending offer in main screen ABOVE the main buttons, since below it might be missed....1
-- !!!! calculate fee sum to include routing fees - needs pre-route estimation before creating invoice
+- !!!! Bitblik pay nwc out of budget show error before trying to pay
 - !!!! status payingTaker is not shown to taker
 - !!! Brandkit ala https://github.com/getAlby/media  & https://getalby.com/brandkit (from figma)
 - !!!! should not be able to cancel offer if not sure it didn't got created (paid invoice NWC) in coordinator, otherwise client looses access to it.
@@ -23,11 +22,6 @@
 -!!! premium % above market price for maker
 -!!! start the offer with higher taker fees, and if some seconds it's still not reserved decrease the taker fees and send new notification to groups
 
--!!! NWC wallet integration
-    - ndk.wallets (NWC) from leo's branch
-    - use ndk.accounts instead of single signer (multiple nekos)
-    - maybe ndk_flutter luc's widgets?
-
 -!!! info + checkbox risk of refund BLIK acceptance
     - choice of type of payment
         - physical good in shop
@@ -37,6 +31,9 @@
 -!! how to communicate with maker/taker on dispute?
     - send nostr DM to coordinator (which NIP?)
     - sign message tool in neko
+
+- !! calculate fee sum to include routing fees - needs pre-route estimation before creating invoice
+    - not really possible now that we don't get a lnurl but get the precise invoice amount from taker client's during submitBlik :-/
 
 -!! ??? in invalidBlik status maker has no way out, so taker can DoS attack maker by sending invalid blik codes
     - max 3 blik codes for same taker pubKey?
@@ -58,12 +55,24 @@
 -!! psql backup cron
 
 === IMPROVEMENTS
--!!! missing clock progress in make confirm blik (2min)
-    - and after inform of 60m it will automatically be settled in taker's favor
-- taker after is not the first reservation but the last from reserved_at in stats and finished offers
+- show all available coordinators but sorted by:
+    - favorites
+    - amount of zaps to bitblik from coordinator
+    - amount of offers successfully finished in last xxxx days (how to verify success? without manipulation?)
+    - amount of successfull offers by current neko???? NOOOOO!, bad privacy ....unless master key and each neko derived key
+
 -!!! whitelist coordinators:
     - from bitblik followed list
     - list of default accepted coordinator's npubs in client, overridable by env vars for test.bitblik.app
+
+-!!! missing clock progress in make confirm blik (2min)
+    - and after inform of 60m it will automatically be settled in taker's favor
+- taker after is not the first reservation but the last from reserved_at in stats and finished offers
+
+-!! use ndk.accounts instead of single signer (multiple nekos)
+
+-!
+
 -!! coordinator metadata kind-0
     - name
     - avatar picture

@@ -1628,6 +1628,66 @@ void main() {
         expect(offer.status, OfferStatus.expiredSentBlik);
       });
     });
+
+    test(
+        'invalidBlik -> conflict starts 60m timer, then auto-settles maker hold invoice and moves to dispute',
+        () {
+      fakeAsync((async) {
+        final offerId = 'conflict-auto-dispute-offer-id';
+        final offer = createTestOffer(
+          id: offerId,
+          status: OfferStatus.invalidBlik,
+          makerPubkey: testMakerId,
+          takerPubkey: testTakerId,
+          holdInvoicePreimage: testPreimage,
+          createdAt: clock.now().toUtc(),
+        );
+
+        when(mockDbService.getOfferById(offerId))
+            .thenAnswer((_) async => offer);
+
+        when(mockDbService.updateOfferStatus(offerId, OfferStatus.conflict))
+            .thenAnswer((_) async {
+          offer.status = OfferStatus.conflict;
+          offer.updatedAt = clock.now().toUtc();
+          return true;
+        });
+
+        when(mockDbService.updateOfferStatus(offerId, OfferStatus.dispute))
+            .thenAnswer((_) async {
+          offer.status = OfferStatus.dispute;
+          offer.updatedAt = clock.now().toUtc();
+          return true;
+        });
+
+        when(mockPaymentService.settleInvoice(preimageHex: testPreimage))
+            .thenAnswer((_) async {});
+
+        coordinatorService.markBlikCharged(offerId, testTakerId).then((result) {
+          expect(result, isTrue);
+        });
+        async.flushMicrotasks();
+
+        expect(offer.status, OfferStatus.conflict);
+
+        async.elapse(Duration(seconds: 3599));
+        async.flushMicrotasks();
+
+        verifyNever(
+            mockPaymentService.settleInvoice(preimageHex: testPreimage));
+        verifyNever(
+            mockDbService.updateOfferStatus(offerId, OfferStatus.dispute));
+
+        async.elapse(Duration(seconds: 2));
+        async.flushMicrotasks();
+
+        verify(mockPaymentService.settleInvoice(preimageHex: testPreimage))
+            .called(1);
+        verify(mockDbService.updateOfferStatus(offerId, OfferStatus.dispute))
+            .called(1);
+        expect(offer.status, OfferStatus.dispute);
+      });
+    });
   }); // End of Timeout Behaviors (using FakeAsync) group
 
   group('User Actions, State Transitions, and Edge Cases', () {

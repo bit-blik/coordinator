@@ -72,6 +72,9 @@ class CoordinatorService {
   // taker charged timeout configuration
   late final int _takerChargedAutoConfirmTimeoutSeconds;
 
+  // conflict -> dispute auto-transition timeout configuration
+  late final int _conflictAutoDisputeTimeoutSeconds;
+
   // Exchange rate cache
   double? _cachedPlnRate;
   DateTime? _cachedPlnRateTime;
@@ -214,6 +217,7 @@ class CoordinatorService {
   final Map<String, Timer> _blikConfirmationTimers = {};
   final Map<String, Timer> _fundedOfferTimers = {};
   final Map<String, Timer> _takerChargedTimers = {};
+  final Map<String, Timer> _conflictTimers = {};
 
   // Fee percentages, configurable via environment variables
   late final double _makerFeePercentage;
@@ -272,6 +276,7 @@ class CoordinatorService {
     _takerChargedAutoConfirmTimeoutSeconds =
         int.tryParse(_env['TAKER_CHARGED_AUTO_CONFIRM_SECONDS'] ?? '') ??
             3600; // 1h
+    _conflictAutoDisputeTimeoutSeconds = 3600; // 60m
 
     _makerFeePercentage =
         double.tryParse(_env['MAKER_FEE'] ?? '') ?? 0.5; // Default to 0.5%
@@ -316,6 +321,7 @@ class CoordinatorService {
     await _checkExpiredReservations();
     await _checkExpiredBlikConfirmations();
     await _checkTakerChargedAutoConfirm();
+    await _checkConflictAutoDispute();
   }
 
   Future<void> _initializeMatrixClient() async {
@@ -523,6 +529,47 @@ class CoordinatorService {
           'takerCharged auto confirm offer check complete. Auto confirmed $cancelledCount offers, restarted timers for $timerRestartedCount offers.');
     } catch (e) {
       print('Error during takerCharged auto confirm check: $e');
+    }
+  }
+
+  Future<void> _checkConflictAutoDispute() async {
+    print('Checking for conflict auto dispute on startup...');
+    if (_paymentBackend == null) {
+      print('Skipping, no payment backend configured.');
+      return;
+    }
+
+    try {
+      final offers =
+          await _dbService.getOffersByStatus(OfferStatus.conflict, limit: 1000);
+      final now = _clock.now().toUtc();
+      final timeoutDuration =
+          Duration(seconds: _conflictAutoDisputeTimeoutSeconds);
+
+      int autoDisputedCount = 0;
+      int timerRestartedCount = 0;
+      for (final offer in offers) {
+        final conflictStartAt = (offer.updatedAt ?? offer.createdAt).toUtc();
+        final expiryTime = conflictStartAt.add(timeoutDuration);
+        if (now.isAfter(expiryTime)) {
+          print(
+              'Offer ${offer.id} conflict timeout reached (entered conflict at $conflictStartAt, expired at $expiryTime). Opening dispute.');
+          final success = await openDispute(offer.id, offer.makerPubkey);
+          if (success) {
+            autoDisputedCount++;
+          }
+        } else {
+          print(
+              'Offer ${offer.id} still within conflict window (expires at $expiryTime). Restarting timer.');
+          _startConflictTimer(offer);
+          timerRestartedCount++;
+        }
+      }
+
+      print(
+          'Conflict auto dispute check complete. Auto disputed $autoDisputedCount offers, restarted timers for $timerRestartedCount offers.');
+    } catch (e) {
+      print('Error during conflict auto dispute check: $e');
     }
   }
 
@@ -1054,6 +1101,58 @@ class CoordinatorService {
     }
   }
 
+  void _startConflictTimer(Offer offer) {
+    if (offer.status != OfferStatus.conflict) {
+      print(
+          'Error: Cannot start conflict timer for offer ${offer.id} - not in state conflict, status is ${offer.status}');
+      return;
+    }
+
+    _conflictTimers[offer.id]?.cancel();
+
+    final now = _clock.now().toUtc();
+    final conflictStartAt = (offer.updatedAt ?? now).toUtc();
+    final expirationTime = conflictStartAt
+        .add(Duration(seconds: _conflictAutoDisputeTimeoutSeconds));
+    final remainingDuration = expirationTime.difference(now);
+
+    if (remainingDuration.isNegative || remainingDuration.inSeconds == 0) {
+      print(
+          'Offer ${offer.id} has already passed conflict timeout. Handling auto dispute immediately.');
+      _conflictTimers.remove(offer.id);
+      _handleConflictTimeout(offer.id);
+      return;
+    }
+
+    print(
+        'Starting conflict auto dispute timer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s');
+    _conflictTimers[offer.id] = Timer(remainingDuration, () {
+      print('Conflict timer expired for offer ${offer.id}');
+      _conflictTimers.remove(offer.id);
+      _handleConflictTimeout(offer.id);
+    });
+  }
+
+  Future<void> _handleConflictTimeout(String offerId) async {
+    print('Handling conflict timeout for offer $offerId');
+    final offer = await _dbService.getOfferById(offerId);
+    if (offer == null) {
+      print('Offer $offerId not found while handling conflict timeout.');
+      return;
+    }
+    if (offer.status != OfferStatus.conflict) {
+      print(
+          'Offer $offerId is no longer in conflict (current status: ${offer.status}). No action needed for conflict timeout.');
+      return;
+    }
+
+    final success = await openDispute(offerId, offer.makerPubkey);
+    if (!success) {
+      print(
+          'Failed to auto-open dispute for offer $offerId after conflict timeout.');
+    }
+  }
+
   Future<void> _handleTakerChargedAutoConfirmation(Offer offer) async {
     print(
         'Handling taker charged auto confirmation expiration for offer ${offer.id}');
@@ -1486,6 +1585,12 @@ class CoordinatorService {
       final updatedOffer = await _dbService.getOfferById(offerId);
       if (updatedOffer != null) {
         await _publishStatusUpdate(updatedOffer);
+        if (newStatus == OfferStatus.conflict) {
+          _startConflictTimer(updatedOffer);
+        } else {
+          _conflictTimers[offerId]?.cancel();
+          _conflictTimers.remove(offerId);
+        }
       }
     } else {
       print('Failed to update offer $offerId status to $newStatus in DB.');
@@ -1523,6 +1628,12 @@ class CoordinatorService {
       if (updatedOffer != null) {
         await _publishStatusUpdate(updatedOffer);
         await _nostrService?.broadcastNip69OrderFromOffer(updatedOffer);
+        if (newStatus == OfferStatus.conflict) {
+          _startConflictTimer(updatedOffer);
+        } else {
+          _conflictTimers[offerId]?.cancel();
+          _conflictTimers.remove(offerId);
+        }
       }
       if (newStatus == OfferStatus.takerCharged && updatedOffer != null) {
         _startTakerChargedTimer(updatedOffer);
@@ -1535,6 +1646,8 @@ class CoordinatorService {
 
   Future<bool> openDispute(String offerId, String makerId) async {
     print('Maker $makerId marking offer $offerId as dispute.');
+    _conflictTimers[offerId]?.cancel();
+    _conflictTimers.remove(offerId);
     final offer = await _dbService.getOfferById(offerId);
 
     if (offer == null || offer.makerPubkey != makerId) {
@@ -1610,6 +1723,8 @@ class CoordinatorService {
     _reservationTimers.remove(offerId);
     _blikConfirmationTimers[offerId]?.cancel();
     _blikConfirmationTimers.remove(offerId);
+    _conflictTimers[offerId]?.cancel();
+    _conflictTimers.remove(offerId);
     print('Cancelled timers for offer $offerId during maker confirmation.');
 
     bool success =
