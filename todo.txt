@@ -51,7 +51,6 @@
 - dark theme
 
 === TASKS
--!!! review terms of use
 -!! psql backup cron
 
 === IMPROVEMENTS
