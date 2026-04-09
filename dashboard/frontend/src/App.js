@@ -150,6 +150,7 @@ const OffersDashboard = () => {
     return new Intl.DateTimeFormat('pl-PL', {
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'Europe/Warsaw',
     }).format(date);
   };
 
@@ -203,6 +204,7 @@ const OffersDashboard = () => {
 
   const stats = totals ? {
     totalVolume: parseFloat(totals.total_volume || 0),
+    totalVolumeSats: parseFloat(totals.total_volume_sats || 0),
     totalProfitSats: parseFloat(totals.total_profit || 0),
     avgSuccess: parseFloat(totals.overall_success_percentage || 0),
     totalSuccess: parseInt(totals.total_success || 0),
@@ -290,13 +292,21 @@ const OffersDashboard = () => {
                 <div className="relative backdrop-blur-sm bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-4 border border-green-100 hover:border-green-300 hover:-translate-y-1">
                   <div className="flex items-center gap-3">
                     <div className="bg-gradient-to-br from-emerald-400 to-green-600 rounded-lg p-2 shadow-md flex-shrink-0">
-                      <DollarSign className="text-white" size={18} />
+                      <Bitcoin className="text-white" size={18} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-green-800 uppercase tracking-wide mb-1">Volume</p>
-                      <p className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent truncate">
-                        {formatCurrency(stats.totalVolume)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-green-800 uppercase tracking-wide">Volume</p>
+                        <span className="text-xs font-semibold text-emerald-600">
+                          ≈ {formatCurrency(stats.totalVolume)}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <p className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent truncate leading-tight">
+                          {formatNumber(stats.totalVolumeSats)}
+                        </p>
+                        <span className="text-sm font-medium text-green-600">sats</span>
+                      </div>
                     </div>
                   </div>
                   <div className="mt-2 h-0.5 bg-gradient-to-r from-emerald-400 to-green-600 rounded-full"></div>
