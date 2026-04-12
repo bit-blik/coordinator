@@ -175,16 +175,50 @@ app.post('/api/offers-data', async (req, res) => {
       ORDER BY avg_fees_percentage DESC
     `;
 
-    const [groupedResult, totalsResult, takerDomainResult] = await Promise.all([
+    // Successful offers by weekday (Mon-Sun), independent of selected period
+    const weekdaySuccessQuery = `
+      WITH weekdays AS (
+        SELECT
+          day_num,
+          day_name
+        FROM (VALUES
+          (1, 'Mon'),
+          (2, 'Tue'),
+          (3, 'Wed'),
+          (4, 'Thu'),
+          (5, 'Fri'),
+          (6, 'Sat'),
+          (7, 'Sun')
+        ) AS w(day_num, day_name)
+      ),
+      success_by_day AS (
+        SELECT
+          EXTRACT(ISODOW FROM created_at)::INT AS day_num,
+          COUNT(*) AS success_count
+        FROM offers
+        WHERE status = 'takerPaid'
+        GROUP BY EXTRACT(ISODOW FROM created_at)::INT
+      )
+      SELECT
+        w.day_name AS weekday,
+        COALESCE(s.success_count, 0) AS success_count
+      FROM weekdays w
+      LEFT JOIN success_by_day s ON s.day_num = w.day_num
+      ORDER BY w.day_num
+    `;
+
+    const [groupedResult, totalsResult, takerDomainResult, weekdaySuccessResult] = await Promise.all([
       pool.query(groupedQuery),
       pool.query(totalsQuery),
-      pool.query(takerDomainQuery)
+      pool.query(takerDomainQuery),
+      pool.query(weekdaySuccessQuery)
     ]);
 
     res.json({ 
       rows: groupedResult.rows,
       totals: totalsResult.rows[0],
-      takerDomainRanking: takerDomainResult.rows
+      takerDomainRanking: takerDomainResult.rows,
+      weekdaySuccess: weekdaySuccessResult.rows
     });
   } catch (error) {
     console.error('Database error:', error);

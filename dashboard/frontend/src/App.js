@@ -7,6 +7,7 @@ const OffersDashboard = () => {
   const [data, setData] = useState([]);
   const [totals, setTotals] = useState(null);
   const [takerDomainRanking, setTakerDomainRanking] = useState([]);
+  const [weekdaySuccess, setWeekdaySuccess] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [groupBy, setGroupBy] = useState('daily');
@@ -112,6 +113,7 @@ const OffersDashboard = () => {
         setData(result.rows || []);
         setTotals(result.totals || null);
         setTakerDomainRanking(result.takerDomainRanking || []);
+        setWeekdaySuccess(result.weekdaySuccess || []);
       } catch (err) {
         setError(err.message);
         console.error('Error fetching data:', err);
@@ -617,6 +619,26 @@ const OffersDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-sky-500"></div>
+                  Successful Offers by Weekday (Total)
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={weekdaySuccess}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="weekday" tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(value) => [formatNumber(value), 'Successful Offers']}
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                    />
+                    <Legend />
+                    <Bar dataKey="success_count" fill="#0ea5e9" name="Successful Offers" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
               <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-200 p-6 card-shine">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-violet-500"></div>
