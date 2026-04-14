@@ -15,6 +15,7 @@ import '../models/invoice_update.dart';
 import '../models/pay_invoice_result.dart';
 // Import the interface
 import 'payment_service.dart';
+import '../logging/app_logger.dart';
 
 /// Service to interact with Nostr Wallet Connect (NWC) for hold invoices.
 class NwcService implements PaymentService {
@@ -36,7 +37,7 @@ class NwcService implements PaymentService {
     // If _nwcConnection is not null, it implies a connection attempt was made.
     // NDK's connect method should handle re-initialization or throw if called inappropriately.
     if (_nwcConnection != null) {
-      print(
+      AppLogger.info(
           'NWC Service: _nwcConnection object exists. Assuming NDK connect handles this or will refresh.');
       // To ensure a completely fresh connection, one might explicitly disconnect first:
       // await disconnect();
@@ -46,13 +47,13 @@ class NwcService implements PaymentService {
       // If issues persist with re-connection, uncommenting the disconnect lines might be necessary.
     }
     try {
-      print('NWC Service: Connecting to $_nwcUri...');
+      AppLogger.info('NWC Service: Connecting to $_nwcUri...');
       _nwcConnection = await _ndk.nwc.connect(
         _nwcUri,
         doGetInfoMethod: doGetInfoMethod,
         onError: onError ??
             (error) {
-              print('NWC Service: Connection error: $error');
+              AppLogger.info('NWC Service: Connection error: $error');
               _nwcConnection = null; // Ensure _nwcConnection is null on error
               throw Exception('NWC Connection failed: $error');
             },
@@ -73,11 +74,11 @@ class NwcService implements PaymentService {
             'NWC Connection failed: make_hold_invoice, settle_hold_invoice & cancel_hold_invoice permission needed. Make sure to use a NWC wallet provider that supports these permissions like Alby Hub >= 1.18.0');
       }
 
-      print(
+      AppLogger.info(
           'NWC Service: Connected successfully to wallet: ${_nwcConnection?.uri.walletPubkey}.');
       _subscribeToInternalNwcNotifications();
     } catch (e) {
-      print('NWC Service: Failed to connect: $e');
+      AppLogger.info('NWC Service: Failed to connect: $e');
       _nwcConnection =
           null; // Ensure _nwcConnection is null on any exception during connect
       rethrow;
@@ -89,7 +90,7 @@ class NwcService implements PaymentService {
     _internalNwcNotificationSubscription =
         _nwcConnection?.holdInvoiceStateStream.listen(
       (NwcNotification notification) {
-        print(
+        AppLogger.info(
             'NWC Service: Internal NWC Notification: ${notification.notificationType} for hash ${notification.paymentHash}');
         InvoiceStatus status; // Use InvoiceStatus from interface
         // Assuming notification.notificationType is a String.
@@ -113,18 +114,20 @@ class NwcService implements PaymentService {
             paymentHash: notification.paymentHash, status: status));
       },
       onError: (error) {
-        print('NWC Service: Error on internal NWC notification stream: $error');
+        AppLogger.info(
+            'NWC Service: Error on internal NWC notification stream: $error');
         _invoiceSubscriptionController.addError(error);
       },
       onDone: () {
-        print('NWC Service: Internal NWC notification stream completed.');
+        AppLogger.info(
+            'NWC Service: Internal NWC notification stream completed.');
       },
     );
   }
 
   @override
   Future<void> disconnect() async {
-    print('NWC Service: Disconnecting...');
+    AppLogger.info('NWC Service: Disconnecting...');
     await _internalNwcNotificationSubscription?.cancel();
     // Do not close _invoiceSubscriptionController here, its lifecycle is managed by its listeners.
     if (_nwcConnection != null) {
@@ -135,7 +138,7 @@ class NwcService implements PaymentService {
     // _ndk.destroy(); // NDK instance might be shared or have a longer lifecycle.
     // Consider if NDK should be destroyed here or managed externally.
     // For now, let's assume NDK is managed at a higher level or NwcService is a singleton.
-    print('NWC Service: Disconnected.');
+    AppLogger.info('NWC Service: Disconnected.');
   }
 
   @override
@@ -148,7 +151,7 @@ class NwcService implements PaymentService {
       // No .isConnected check
       throw Exception('NWC Service: Not connected.');
     }
-    print(
+    AppLogger.info(
         'NWC Service: Creating hold invoice: amountSats=$amountSats, paymentHash=$paymentHashHex, memo=$memo');
     try {
       // NWC's makeHoldInvoice uses 'description' not 'memo'
@@ -163,14 +166,14 @@ class NwcService implements PaymentService {
         throw Exception(
             'NWC Error creating hold invoice: ${response.errorCode} - ${response.errorMessage}');
       }
-      print(
+      AppLogger.info(
           'NWC Service: Hold invoice created: ${response.invoice}, paymentHash: ${response.paymentHash}');
       return CreateHoldInvoiceResult(
         invoice: response.invoice,
         paymentHash: response.paymentHash, // Prefer response hash if available
       );
     } catch (e) {
-      print('NWC Service: Error in createHoldInvoice: $e');
+      AppLogger.info('NWC Service: Error in createHoldInvoice: $e');
       rethrow;
     }
   }
@@ -184,7 +187,8 @@ class NwcService implements PaymentService {
       throw Exception(
           'NWC Service: Not connected. Cannot subscribe to invoice updates.');
     }
-    print('NWC Service: Subscribing to invoice updates for $paymentHashHex');
+    AppLogger.info(
+        'NWC Service: Subscribing to invoice updates for $paymentHashHex');
     // Filter the broadcast stream for the specific payment hash
     return _invoiceSubscriptionController.stream
         .where((data) => data.paymentHash == paymentHashHex);
@@ -195,7 +199,8 @@ class NwcService implements PaymentService {
     if (_nwcConnection == null) {
       throw Exception('NWC Service: Not connected.');
     }
-    print('NWC Service: Settling hold invoice with preimage: $preimageHex');
+    AppLogger.info(
+        'NWC Service: Settling hold invoice with preimage: $preimageHex');
     try {
       final response = await _ndk.nwc.settleHoldInvoice(
         _nwcConnection!,
@@ -205,9 +210,9 @@ class NwcService implements PaymentService {
         throw Exception(
             'NWC Error settling hold invoice: ${response.errorCode} - ${response.errorMessage}');
       }
-      print('NWC Service: Hold invoice settled successfully.');
+      AppLogger.info('NWC Service: Hold invoice settled successfully.');
     } catch (e) {
-      print('NWC Service: Error in settleHoldInvoice: $e');
+      AppLogger.info('NWC Service: Error in settleHoldInvoice: $e');
       rethrow;
     }
   }
@@ -217,7 +222,7 @@ class NwcService implements PaymentService {
     if (_nwcConnection == null) {
       throw Exception('NWC Service: Not connected.');
     }
-    print(
+    AppLogger.info(
         'NWC Service: Canceling hold invoice with paymentHash: $paymentHashHex');
     try {
       final response = await _ndk.nwc.cancelHoldInvoice(
@@ -228,9 +233,9 @@ class NwcService implements PaymentService {
         throw Exception(
             'NWC Error canceling hold invoice: ${response.errorCode} - ${response.errorMessage}');
       }
-      print('NWC Service: Hold invoice canceled successfully.');
+      AppLogger.info('NWC Service: Hold invoice canceled successfully.');
     } catch (e) {
-      print('NWC Service: Error in cancelHoldInvoice: $e');
+      AppLogger.info('NWC Service: Error in cancelHoldInvoice: $e');
       rethrow;
     }
   }
@@ -244,7 +249,7 @@ class NwcService implements PaymentService {
     if (_nwcConnection == null) {
       throw Exception('NWC Service: Not connected.');
     }
-    print('NWC Service: Paying invoice: $invoice');
+    AppLogger.info('NWC Service: Paying invoice: $invoice');
     try {
       final response = await _ndk.nwc.payInvoice(
         _nwcConnection!,
@@ -252,7 +257,7 @@ class NwcService implements PaymentService {
       );
 
       if (response.errorCode != null) {
-        print(
+        AppLogger.info(
             'NWC Service: Error paying invoice: ${response.errorCode} - ${response.errorMessage}');
         return PayInvoiceResult(
           paymentError: // Use paymentError
@@ -260,7 +265,7 @@ class NwcService implements PaymentService {
         );
       }
 
-      print(
+      AppLogger.info(
           'NWC Service: Invoice paid successfully. Preimage: ${response.preimage}');
       return PayInvoiceResult(
         paymentPreimage: response.preimage, // Use paymentPreimage
@@ -268,7 +273,7 @@ class NwcService implements PaymentService {
         feeSat: null, // Or 0 if a value is strictly needed
       );
     } catch (e) {
-      print('NWC Service: Exception in payInvoice: $e');
+      AppLogger.info('NWC Service: Exception in payInvoice: $e');
       return PayInvoiceResult(paymentError: e.toString()); // Use paymentError
     }
   }
@@ -284,7 +289,7 @@ class NwcService implements PaymentService {
   Future<void> disposeNdk() async {
     await disconnect(); // Disconnects NWC connection
     await _ndk.destroy(); // Destroys the NDK instance
-    print('NWC Service: NDK instance disposed.');
+    AppLogger.info('NWC Service: NDK instance disposed.');
   }
 
   /// Checks if the service is currently connected to an NWC provider.
@@ -321,7 +326,7 @@ class NwcService implements PaymentService {
     if (_nwcConnection == null) {
       throw Exception('NWC Service: Not connected.');
     }
-    print('NWC Service: Looking up invoice for hash: $paymentHashHex');
+    AppLogger.info('NWC Service: Looking up invoice for hash: $paymentHashHex');
     try {
       // The NDK's lookupInvoice returns a response object (e.g. NwcPayInvoiceResponse or LookupInvoiceResponse)
       // which should have top-level fields like errorCode, errorMessage, and then specific invoice fields.
@@ -331,7 +336,7 @@ class NwcService implements PaymentService {
       );
 
       if (nwcResponse.errorCode != null) {
-        print(
+        AppLogger.info(
             'NWC Service: Error looking up invoice ${nwcResponse.paymentHash}: ${nwcResponse.errorCode} - ${nwcResponse.errorMessage}');
         return InvoiceDetails(
           paymentHash: nwcResponse.paymentHash,
@@ -366,7 +371,8 @@ class NwcService implements PaymentService {
         status: status, // Inferred status
       );
     } catch (e) {
-      print('NWC Service: Exception in lookupInvoice for $paymentHashHex: $e');
+      AppLogger.info(
+          'NWC Service: Exception in lookupInvoice for $paymentHashHex: $e');
       return InvoiceDetails(
         paymentHash: paymentHashHex,
         error: 'Exception during NWC lookupInvoice: ${e.toString()}',

@@ -30,6 +30,23 @@ CREATE INDEX IF NOT EXISTS idx_offers_status ON offers (status);
 CREATE INDEX IF NOT EXISTS idx_offers_maker_pubkey ON offers (maker_pubkey);
 CREATE INDEX IF NOT EXISTS idx_offers_taker_pubkey ON offers (taker_pubkey);
 
+-- Audit logs persisted from application logger (onRecord listener)
+CREATE TABLE IF NOT EXISTS log_audit (
+  id BIGSERIAL PRIMARY KEY,
+  offer_id TEXT,
+  action TEXT NOT NULL,
+  level TEXT NOT NULL,
+  logger_name TEXT NOT NULL,
+  message TEXT NOT NULL,
+  error TEXT,
+  stack_trace TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_log_audit_offer_id ON log_audit (offer_id);
+CREATE INDEX IF NOT EXISTS idx_log_audit_action ON log_audit (action);
+
 -- Grant necessary privileges (adjust user 'user' if needed)
 -- GRANT ALL PRIVILEGES ON TABLE offers TO "user";
 -- GRANT USAGE, SELECT ON SEQUENCE offers_id_seq TO "user"; -- If using SERIAL instead of UUID

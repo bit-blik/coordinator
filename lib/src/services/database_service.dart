@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:postgres/postgres.dart';
 import 'package:dotenv/dotenv.dart';
 import '../models/offer.dart';
+import '../logging/app_logger.dart';
 
 class DatabaseService {
   PostgreSQLConnection? _connection;
   late DotEnv _env;
+  bool _auditTableReady = false;
 
   DatabaseService() {
     _env = DotEnv(includePlatformEnvironment: true)..load();
@@ -30,10 +34,16 @@ class DatabaseService {
     );
     try {
       await _connection!.open();
-      print('Database connection established.');
+      AppLogger.info('Database connection established.',
+          action: 'database.connection.opened');
       await _ensureOffersTable();
+      await _ensureLogAuditTable();
     } catch (e) {
-      print('Error connecting to database: $e');
+      AppLogger.severe(
+        'Error connecting to database: $e',
+        action: 'database.connection.error',
+        error: e,
+      );
       _connection = null;
       rethrow;
     }
@@ -42,7 +52,8 @@ class DatabaseService {
   Future<void> disconnect() async {
     await _connection?.close();
     _connection = null;
-    print('Database connection closed.');
+    AppLogger.info('Database connection closed.',
+        action: 'database.connection.closed');
   }
 
   Future<void> _ensureOffersTable() async {
@@ -82,7 +93,71 @@ class DatabaseService {
     await _connection!.execute('''
       CREATE INDEX IF NOT EXISTS idx_offers_taker_pubkey ON offers (taker_pubkey);
     ''');
-    print('Offers table checked/created.');
+    AppLogger.info('Offers table checked/created.',
+        action: 'database.schema.offers.ready');
+  }
+
+  Future<void> _ensureLogAuditTable() async {
+    if (_connection == null) throw StateError('Database not connected.');
+    await _connection!.execute('''
+      CREATE TABLE IF NOT EXISTS log_audit (
+        id BIGSERIAL PRIMARY KEY,
+        offer_id TEXT,
+        action TEXT NOT NULL,
+        level TEXT NOT NULL,
+        logger_name TEXT NOT NULL,
+        message TEXT NOT NULL,
+        error TEXT,
+        stack_trace TEXT,
+        metadata JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    ''');
+    await _connection!.execute('''
+      CREATE INDEX IF NOT EXISTS idx_log_audit_offer_id ON log_audit (offer_id);
+    ''');
+    await _connection!.execute('''
+      CREATE INDEX IF NOT EXISTS idx_log_audit_action ON log_audit (action);
+    ''');
+    _auditTableReady = true;
+    AppLogger.info('log_audit table checked/created.',
+        action: 'database.schema.log_audit.ready');
+  }
+
+  Future<void> insertAuditLog({
+    required String level,
+    required String loggerName,
+    required String message,
+    required String action,
+    String? offerId,
+    String? error,
+    String? stackTrace,
+    Map<String, dynamic>? metadata,
+  }) async {
+    if (_connection == null || _connection!.isClosed) {
+      return;
+    }
+    if (!_auditTableReady) {
+      await _ensureLogAuditTable();
+    }
+
+    await _connection!.execute(
+      '''
+        INSERT INTO log_audit (offer_id, action, level, logger_name, message, error, stack_trace, metadata, created_at)
+        VALUES (@offer_id, @action, @level, @logger_name, @message, @error, @stack_trace, CAST(@metadata AS JSONB), @created_at)
+      ''',
+      substitutionValues: {
+        'offer_id': offerId,
+        'action': action,
+        'level': level,
+        'logger_name': loggerName,
+        'message': message,
+        'error': error,
+        'stack_trace': stackTrace,
+        'metadata': metadata == null ? null : jsonEncode(metadata),
+        'created_at': DateTime.now().toUtc(),
+      },
+    );
   }
 
   Future<Offer> createOffer(Offer offer) async {
@@ -238,8 +313,9 @@ class DatabaseService {
         if (takerFees == null) {
           // Renamed check
           // Optionally throw an error, or just log a warning if fees are expected
-          print(
-              'Warning: Updating status to takerPaid without providing takerFees for offer $id');
+          AppLogger.info(
+              'Warning: Updating status to takerPaid without providing takerFees for offer $id',
+              offerId: id);
         }
         params['taker_paid_at'] = now;
         params['taker_fees'] = takerFees; // Renamed parameter and column
@@ -265,9 +341,10 @@ class DatabaseService {
         break;
     }
 
-    print(
-        '[DatabaseService.updateOfferStatus] Executing update for offer $id with status $newStatus. Params: $params');
-    print(
+    AppLogger.info(
+        '[DatabaseService.updateOfferStatus] Executing update for offer $id with status $newStatus. Params: $params',
+        offerId: id);
+    AppLogger.info(
         '[DatabaseService.updateOfferStatus] SQL: UPDATE offers SET ${setClauses.join(', ')} WHERE id = @id');
 
     final affectedRows = await _connection!.execute(
