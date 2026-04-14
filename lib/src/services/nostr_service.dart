@@ -189,9 +189,9 @@ class NostrService {
             takerPubkey, statusUpdateJson, offerId, status, paymentHash);
       }
 
-      AppLogger.info(
-          'Sent encrypted status updates for offer $offerId with status $status to maker and taker',
-          offerId: offerId);
+      // AppLogger.info(
+      //     'Sent encrypted status updates for offer $offerId with status $status to maker and taker',
+      //     offerId: offerId);
     } catch (e) {
       AppLogger.info('Error sending encrypted offer status updates: $e',
           offerId: offerId);
@@ -285,7 +285,7 @@ class NostrService {
       event.pubKey,
     );
 
-    AppLogger.info('Decrypted request: $decryptedContent');
+    // AppLogger.info('Decrypted request: $decryptedContent');
 
     // Parse the request
     final request = jsonDecode(decryptedContent) as Map<String, dynamic>;

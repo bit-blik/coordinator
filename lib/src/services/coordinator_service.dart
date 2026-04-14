@@ -1367,8 +1367,8 @@ class CoordinatorService {
       reservedAt: null, // Ensure reservedAt is cleared
     );
     if (success) {
-      AppLogger.info('Offer $offerId successfully reverted to funded.',
-          offerId: offerId);
+      // AppLogger.info('Offer $offerId successfully reverted to funded.',
+      //     offerId: offerId);
       // Restart the funded offer timer
       final offer = await _dbService.getOfferById(offerId);
       if (offer != null) {

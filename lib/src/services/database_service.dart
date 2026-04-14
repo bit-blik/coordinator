@@ -364,11 +364,11 @@ class DatabaseService {
         break;
     }
 
-    AppLogger.info(
-        '[DatabaseService.updateOfferStatus] Executing update for offer $id with status $newStatus. Params: $params',
-        offerId: id);
-    AppLogger.info(
-        '[DatabaseService.updateOfferStatus] SQL: UPDATE offers SET ${setClauses.join(', ')} WHERE id = @id');
+    // AppLogger.info(
+    //     '[DatabaseService.updateOfferStatus] Executing update for offer $id with status $newStatus. Params: $params',
+    //     offerId: id);
+    // AppLogger.info(
+    //     '[DatabaseService.updateOfferStatus] SQL: UPDATE offers SET ${setClauses.join(', ')} WHERE id = @id');
 
     final affectedRows = await _connection!.execute(
       'UPDATE offers SET ${setClauses.join(', ')} WHERE id = @id',
