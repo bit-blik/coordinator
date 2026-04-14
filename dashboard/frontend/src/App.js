@@ -113,7 +113,13 @@ const OffersDashboard = () => {
         setData(result.rows || []);
         setTotals(result.totals || null);
         setTakerDomainRanking(result.takerDomainRanking || []);
-        setWeekdaySuccess(result.weekdaySuccess || []);
+        setWeekdaySuccess(
+          (result.weekdaySuccess || []).map((item) => ({
+            ...item,
+            success_count: parseInt(item.success_count || 0, 10),
+            avg_offer_count: parseFloat(item.avg_offer_count || 0),
+          }))
+        );
       } catch (err) {
         setError(err.message);
         console.error('Error fetching data:', err);
@@ -628,13 +634,36 @@ const OffersDashboard = () => {
                   <BarChart data={weekdaySuccess}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="weekday" tick={{ fill: '#6b7280', fontSize: 12 }} />
-                    <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis
+                      yAxisId="left"
+                      tick={{ fill: '#6b7280', fontSize: 12 }}
+                      label={{ value: 'Success (Total)', angle: -90, position: 'insideLeft', style: { fill: '#0ea5e9' } }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tick={{ fill: '#6b7280', fontSize: 12 }}
+                      tickFormatter={(value) => Number(value).toFixed(2)}
+                      label={{ value: 'Avg Offers', angle: 90, position: 'insideRight', style: { fill: '#6366f1' } }}
+                    />
                     <Tooltip
-                      formatter={(value) => [formatNumber(value), 'Successful Offers']}
+                      formatter={(value, name) => {
+                        if (name === 'Avg Offers') return [Number(value).toFixed(2), name];
+                        return [formatNumber(value), name];
+                      }}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
                     />
                     <Legend />
-                    <Bar dataKey="success_count" fill="#0ea5e9" name="Successful Offers" />
+                    <Bar yAxisId="left" dataKey="success_count" fill="#0ea5e9" name="Successful Offers" />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="avg_offer_count"
+                      stroke="#6366f1"
+                      strokeWidth={2}
+                      name="Avg Offers"
+                      dot={{ fill: '#6366f1', r: 4 }}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

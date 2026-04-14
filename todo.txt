@@ -19,6 +19,7 @@
 
 
 === FEATURES
+- 1111 - instead of logging to console, write in psql table to be able to browse later per offer in new admin panel
 -!!! premium % above market price for maker
 -!!! start the offer with higher taker fees, and if some seconds it's still not reserved decrease the taker fees and send new notification to groups
 

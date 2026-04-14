@@ -191,19 +191,48 @@ app.post('/api/offers-data', async (req, res) => {
           (7, 'Sun')
         ) AS w(day_num, day_name)
       ),
-      success_by_day AS (
+      date_bounds AS (
         SELECT
-          EXTRACT(ISODOW FROM created_at)::INT AS day_num,
-          COUNT(*) AS success_count
+          DATE(MIN(created_at)) AS min_date,
+          DATE(MAX(created_at)) AS max_date
         FROM offers
-        WHERE status = 'takerPaid'
-        GROUP BY EXTRACT(ISODOW FROM created_at)::INT
+      ),
+      calendar_dates AS (
+        SELECT
+          generate_series(min_date, max_date, INTERVAL '1 day')::DATE AS offer_date
+        FROM date_bounds
+        WHERE min_date IS NOT NULL
+      ),
+      offers_by_date AS (
+        SELECT
+          DATE(created_at) AS offer_date,
+          COUNT(*) FILTER (WHERE status = 'takerPaid') AS success_count,
+          COUNT(*) AS offer_count
+        FROM offers
+        GROUP BY DATE(created_at)
+      ),
+      weekday_daily AS (
+        SELECT
+          EXTRACT(ISODOW FROM c.offer_date)::INT AS day_num,
+          COALESCE(o.success_count, 0) AS success_count,
+          COALESCE(o.offer_count, 0) AS offer_count
+        FROM calendar_dates c
+        LEFT JOIN offers_by_date o ON o.offer_date = c.offer_date
+      ),
+      weekday_aggregates AS (
+        SELECT
+          day_num,
+          SUM(success_count) AS success_count,
+          ROUND(AVG(offer_count)::NUMERIC, 2) AS avg_offer_count
+        FROM weekday_daily
+        GROUP BY day_num
       )
       SELECT
         w.day_name AS weekday,
-        COALESCE(s.success_count, 0) AS success_count
+        COALESCE(a.success_count, 0) AS success_count,
+        COALESCE(a.avg_offer_count, 0) AS avg_offer_count
       FROM weekdays w
-      LEFT JOIN success_by_day s ON s.day_num = w.day_num
+      LEFT JOIN weekday_aggregates a ON a.day_num = w.day_num
       ORDER BY w.day_num
     `;
 
