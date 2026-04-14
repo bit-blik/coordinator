@@ -714,9 +714,9 @@ class NostrService {
 
       await _ndk.broadcast.broadcast(
           nostrEvent: event, customSigner: _signer, specificRelays: _relays);
-      AppLogger.info(
-          'Broadcasted NIP-69 order event for offer ${offer.id}, status: ${status} id:${event.id}',
-          offerId: offer.id);
+      // AppLogger.info(
+      //     'Broadcasted NIP-69 order event for offer ${offer.id}, status: ${status} id:${event.id}',
+      //     offerId: offer.id);
     } catch (e) {
       AppLogger.info(
           'Error broadcasting NIP-69 order event for offer ${offer.id}: $e',

@@ -1640,12 +1640,12 @@ class CoordinatorService {
   }
 
   Future<bool> markBlikInvalid(String offerId, String makerId) async {
-    AppLogger.info('Maker $makerId marking BLIK as invalid for offer $offerId',
+    AppLogger.warning('Maker $makerId marking BLIK as invalid for offer $offerId',
         offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
 
     if (offer == null || offer.makerPubkey != makerId) {
-      AppLogger.info(
+      AppLogger.warning(
           'Offer $offerId not found or maker ID mismatch for marking BLIK invalid.',
           offerId: offerId);
       return false;
@@ -1654,7 +1654,7 @@ class CoordinatorService {
     if (offer.status != OfferStatus.takerCharged &&
         offer.status != OfferStatus.blikSentToMaker &&
         offer.status != OfferStatus.expiredSentBlik) {
-      AppLogger.info(
+      AppLogger.warning(
           'Offer $offerId is not in a state where BLIK can be marked invalid (current state: ${offer.status}).',
           offerId: offerId);
       return false;
@@ -1662,9 +1662,9 @@ class CoordinatorService {
 
     _blikConfirmationTimers[offerId]?.cancel();
     _blikConfirmationTimers.remove(offerId);
-    AppLogger.info(
-        'Cancelled BLIK confirmation timer for offer $offerId (if active).',
-        offerId: offerId);
+    // AppLogger.info(
+    //     'Cancelled BLIK confirmation timer for offer $offerId (if active).',
+    //     offerId: offerId);
 
     final newStatus = offer.status != OfferStatus.takerCharged
         ? OfferStatus.invalidBlik
@@ -1688,7 +1688,7 @@ class CoordinatorService {
         }
       }
     } else {
-      AppLogger.info(
+      AppLogger.warning(
           'Failed to update offer $offerId status to $newStatus in DB.',
           offerId: offerId);
     }
