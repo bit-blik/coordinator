@@ -133,7 +133,8 @@ const AnalyticsDashboard = () => {
 
       try {
         // Send only the groupBy parameter - backend handles SQL construction
-        const response = await fetch('http://localhost:3001/api/offers-data', {
+        const apiBase = process.env.REACT_APP_API_BASE || `${window.location.protocol}//${window.location.host}`;
+        const response = await fetch(`${apiBase}/api/offers-data`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

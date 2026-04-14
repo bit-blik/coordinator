@@ -1,8 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { List, RefreshCw, Wifi, WifiOff, Clock, Zap, ChevronRight, X, AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
 
-const WS_URL = process.env.REACT_APP_WS_URL || `ws://${window.location.hostname}:3001/ws/offers`;
-const API_BASE = process.env.REACT_APP_API_BASE || `http://${window.location.hostname}:3001`;
+// Use window.location to dynamically determine protocol and host
+const getWebSocketUrl = () => {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host; // includes port if any
+  return process.env.REACT_APP_WS_URL || `${protocol}//${host}/ws/offers`;
+};
+
+const getApiBase = () => {
+  return process.env.REACT_APP_API_BASE || `${window.location.protocol}//${window.location.host}`;
+};
+
+const WS_URL = getWebSocketUrl();
+const API_BASE = getApiBase();
 
 const STATUS_COLORS = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
