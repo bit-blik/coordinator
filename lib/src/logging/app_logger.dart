@@ -31,6 +31,10 @@ class AuditLogEntry {
 class AppLogger {
   AppLogger._();
 
+  static final RegExp _uuidLikePattern = RegExp(
+    r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b',
+  );
+
   static bool _initialized = false;
   static bool _isPersisting = false;
   static Future<void> Function({
@@ -187,9 +191,21 @@ class AppLogger {
   }
 
   static String? inferOfferIdFromMessage(String message) {
-    final match = RegExp(r'offer\s+([a-zA-Z0-9\-]+)', caseSensitive: false)
-        .firstMatch(message);
-    return match?.group(1);
+    // Only infer IDs that look like UUIDs to avoid false positives such as
+    // "offer check complete" being interpreted as offer_id="check".
+    final match = _uuidLikePattern.firstMatch(message);
+    return match?.group(0);
+  }
+
+  static String? normalizeOfferId(String? candidate) {
+    if (candidate == null) {
+      return null;
+    }
+    final trimmed = candidate.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return _uuidLikePattern.hasMatch(trimmed) ? trimmed : null;
   }
 
   static void _writeToStdout(LogRecord record) {
@@ -213,7 +229,8 @@ class AppLogger {
     final object = record.object;
     final context = object is AuditLogEntry ? object.context : null;
     final message = record.message;
-    final offerId = context?.offerId ?? inferOfferIdFromMessage(message);
+    final offerId =
+        normalizeOfferId(context?.offerId) ?? inferOfferIdFromMessage(message);
     final contextAction = context?.action;
     final action = contextAction == null || contextAction == 'system.event'
         ? inferActionFromMessage(message)

@@ -6,6 +6,10 @@ import '../models/offer.dart';
 import '../logging/app_logger.dart';
 
 class DatabaseService {
+  static final RegExp _uuidLikePattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   PostgreSQLConnection? _connection;
   late DotEnv _env;
   bool _auditTableReady = false;
@@ -119,6 +123,12 @@ class DatabaseService {
     await _connection!.execute('''
       CREATE INDEX IF NOT EXISTS idx_log_audit_action ON log_audit (action);
     ''');
+    await _connection!.execute("""
+      UPDATE log_audit
+      SET offer_id = NULL
+      WHERE offer_id IS NOT NULL
+        AND offer_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+    """);
     _auditTableReady = true;
     AppLogger.info('log_audit table checked/created.',
         action: 'database.schema.log_audit.ready');
@@ -141,13 +151,15 @@ class DatabaseService {
       await _ensureLogAuditTable();
     }
 
+    final normalizedOfferId = _normalizeOfferId(offerId);
+
     await _connection!.execute(
       '''
         INSERT INTO log_audit (offer_id, action, level, logger_name, message, error, stack_trace, metadata, created_at)
         VALUES (@offer_id, @action, @level, @logger_name, @message, @error, @stack_trace, CAST(@metadata AS JSONB), @created_at)
       ''',
       substitutionValues: {
-        'offer_id': offerId,
+        'offer_id': normalizedOfferId,
         'action': action,
         'level': level,
         'logger_name': loggerName,
@@ -158,6 +170,17 @@ class DatabaseService {
         'created_at': DateTime.now().toUtc(),
       },
     );
+  }
+
+  String? _normalizeOfferId(String? candidate) {
+    if (candidate == null) {
+      return null;
+    }
+    final trimmed = candidate.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return _uuidLikePattern.hasMatch(trimmed) ? trimmed : null;
   }
 
   Future<Offer> createOffer(Offer offer) async {
