@@ -127,7 +127,7 @@ class DatabaseService {
       UPDATE log_audit
       SET offer_id = NULL
       WHERE offer_id IS NOT NULL
-        AND offer_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+        AND offer_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\$';
     """);
     _auditTableReady = true;
     AppLogger.info('log_audit table checked/created.',
