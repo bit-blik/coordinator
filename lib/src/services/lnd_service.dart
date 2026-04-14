@@ -13,6 +13,7 @@ import '../models/invoice_update.dart';
 import '../models/create_hold_invoice_result.dart';
 import '../models/invoice_details.dart'; // Added import
 import '../models/pay_invoice_result.dart';
+import '../logging/app_logger.dart';
 
 // Import generated LND gRPC files (adjust paths/names if necessary)
 import '../generated/lnd/lightning.pbgrpc.dart';
@@ -62,7 +63,7 @@ class LndService implements PaymentService {
     try {
       trustedRoots = await File(tlsCertPath).readAsBytes();
     } catch (e) {
-      print('Error reading LND TLS certificate at $tlsCertPath: $e');
+      AppLogger.info('Error reading LND TLS certificate at $tlsCertPath: $e');
       rethrow;
     }
     final channelCredentials = ChannelCredentials.secure(
@@ -75,7 +76,7 @@ class LndService implements PaymentService {
     try {
       macaroonBytes = await File(macaroonPath).readAsBytes();
     } catch (e) {
-      print('Error reading LND macaroon at $macaroonPath: $e');
+      AppLogger.info('Error reading LND macaroon at $macaroonPath: $e');
       rethrow;
     }
     // Convert macaroon bytes to hex string for metadata
@@ -102,10 +103,10 @@ class LndService implements PaymentService {
     // Optional: Test connection with a simple call like GetInfo
     try {
       final info = await _lightningClient!.getInfo(GetInfoRequest());
-      print(
+      AppLogger.info(
           'Connected to LND node: ${info.identityPubkey} (alias: ${info.alias})');
     } catch (e) {
-      print('Error connecting to LND: $e');
+      AppLogger.info('Error connecting to LND: $e');
       await disconnect(); // Clean up channel if connection test fails
       rethrow;
     }
@@ -118,7 +119,7 @@ class LndService implements PaymentService {
     _lightningClient = null;
     _invoicesClient = null;
     _routerClient = null;
-    print('Disconnected from LND.');
+    AppLogger.info('Disconnected from LND.');
   }
 
   @override
@@ -137,7 +138,7 @@ class LndService implements PaymentService {
       ..value = Int64(amountSats)
       ..private = true
       ..expiry = Int64(86400); // 24 hours expiration
-    print('LND: Creating hold invoice for hash: $paymentHashHex');
+    AppLogger.info('LND: Creating hold invoice for hash: $paymentHashHex');
     final response = await _invoicesClient!.addHoldInvoice(request);
     return CreateHoldInvoiceResult(
       invoice: response.paymentRequest,
@@ -151,13 +152,14 @@ class LndService implements PaymentService {
     if (_invoicesClient == null) throw StateError('LND not connected.');
     final paymentHashBytes = _hexToBytes(paymentHashHex);
     final request = SubscribeSingleInvoiceRequest()..rHash = paymentHashBytes;
-    print('LND: Subscribing to invoice updates for hash: $paymentHashHex');
+    AppLogger.info(
+        'LND: Subscribing to invoice updates for hash: $paymentHashHex');
 
     return _invoicesClient!.subscribeSingleInvoice(request).map((lndInvoice) {
       InvoiceStatus status;
       switch (lndInvoice.state) {
         case Invoice_InvoiceState.ACCEPTED:
-          print(
+          AppLogger.info(
               "LND: lndInvoice ACCEPTED cltvExpiry=${lndInvoice.cltvExpiry} paidSats:${lndInvoice.amtPaidSat}");
           status = InvoiceStatus.ACCEPTED;
           break;
@@ -181,7 +183,7 @@ class LndService implements PaymentService {
             : null,
       );
     }).handleError((error) {
-      print(
+      AppLogger.info(
           'LND: Error in invoice subscription stream for $paymentHashHex: $error');
       // Emit an error state or rethrow if appropriate for the application
       // For now, emitting an UNKNOWN status update
@@ -195,7 +197,7 @@ class LndService implements PaymentService {
     if (_invoicesClient == null) throw StateError('LND not connected.');
     final preimageBytes = _hexToBytes(preimageHex);
     final request = SettleInvoiceMsg()..preimage = preimageBytes;
-    print('LND: Settling invoice with preimage...');
+    AppLogger.info('LND: Settling invoice with preimage...');
     await _invoicesClient!.settleInvoice(request);
   }
 
@@ -204,7 +206,7 @@ class LndService implements PaymentService {
     if (_invoicesClient == null) throw StateError('LND not connected.');
     final paymentHashBytes = _hexToBytes(paymentHashHex);
     final request = CancelInvoiceMsg()..paymentHash = paymentHashBytes;
-    print('LND: Cancelling invoice for hash: $paymentHashHex');
+    AppLogger.info('LND: Cancelling invoice for hash: $paymentHashHex');
     await _invoicesClient!.cancelInvoice(request);
   }
 
@@ -237,7 +239,7 @@ class LndService implements PaymentService {
         );
       }
     } catch (e) {
-      print('LND: Error decoding payment request $invoice: $e');
+      AppLogger.info('LND: Error decoding payment request $invoice: $e');
       return PayInvoiceResult(
         paymentError: 'Failed to decode payment request: ${e.toString()}',
       );
@@ -262,33 +264,34 @@ class LndService implements PaymentService {
       );
     }
 
-    print('LND: Sending payment for invoice: $invoice (hash: $paymentHashHex)');
+    AppLogger.info(
+        'LND: Sending payment for invoice: $invoice (hash: $paymentHashHex)');
     try {
       // sendPaymentV2 returns a stream. We need to listen until a terminal state.
       await for (final lndPaymentUpdate
           in _routerClient!.sendPaymentV2(request)) {
         if (lndPaymentUpdate.status == Payment_PaymentStatus.SUCCEEDED) {
-          print(
+          AppLogger.info(
               'LND: Payment SUCCEEDED. Preimage: ${lndPaymentUpdate.paymentPreimage}');
           return PayInvoiceResult(
             paymentPreimage: lndPaymentUpdate.paymentPreimage,
             feeSat: lndPaymentUpdate.feeSat.toInt(),
           );
         } else if (lndPaymentUpdate.status == Payment_PaymentStatus.FAILED) {
-          print(
+          AppLogger.info(
               'LND: Payment FAILED. Reason: ${lndPaymentUpdate.failureReason}');
           return PayInvoiceResult(
             paymentError: lndPaymentUpdate.failureReason.toString(),
           );
         } else if (lndPaymentUpdate.status == Payment_PaymentStatus.IN_FLIGHT) {
-          print('LND: Payment IN_FLIGHT for hash: $paymentHashHex');
+          AppLogger.info('LND: Payment IN_FLIGHT for hash: $paymentHashHex');
           // Continue listening
         }
         // Other states like UNKNOWN, INITIATED can be logged if needed
       }
       // If the stream completes without a terminal SUCCEEDED or FAILED_ERROR,
       // try to track the payment status using trackPaymentV2.
-      print(
+      AppLogger.info(
           'LND: Payment stream completed without definitive SUCCEEDED/FAILED status for $paymentHashHex. Attempting to track payment status...');
       try {
         final trackedResult = await _trackPaymentV2(paymentHashHex);
@@ -296,14 +299,16 @@ class LndService implements PaymentService {
           return trackedResult;
         }
       } catch (e) {
-        print('LND: Exception during trackPaymentV2 for $paymentHashHex: $e');
+        AppLogger.info(
+            'LND: Exception during trackPaymentV2 for $paymentHashHex: $e');
       }
       return PayInvoiceResult(
         paymentError:
             'Payment stream completed without definitive status, and tracking did not resolve it.',
       );
     } catch (e) {
-      print('LND: Exception during sendPaymentV2 for $paymentHashHex: $e');
+      AppLogger.info(
+          'LND: Exception during sendPaymentV2 for $paymentHashHex: $e');
       return PayInvoiceResult(
         paymentError: e.toString(),
       );
@@ -318,29 +323,32 @@ class LndService implements PaymentService {
       ..paymentHash = paymentHashBytes;
     try {
       await for (final update in _routerClient!.trackPaymentV2(req)) {
-        print('!!!!!!!!!!!!!!!!!!!!!!! LND: Payment status : ${update.status}');
+        AppLogger.info(
+            '!!!!!!!!!!!!!!!!!!!!!!! LND: Payment status : ${update.status}');
         if (update.status == Payment_PaymentStatus.SUCCEEDED) {
-          print(
+          AppLogger.info(
               'LND: trackPaymentV2: Payment SUCCEEDED. Preimage: ${update.paymentPreimage}');
           return PayInvoiceResult(
             paymentPreimage: update.paymentPreimage,
             feeSat: update.feeSat.toInt(),
           );
         } else if (update.status == Payment_PaymentStatus.FAILED) {
-          print(
+          AppLogger.info(
               'LND: trackPaymentV2: Payment FAILED. Reason: ${update.failureReason}');
           return PayInvoiceResult(
             paymentError: update.failureReason.toString(),
           );
         } else if (update.status == Payment_PaymentStatus.IN_FLIGHT) {
-          print('LND: trackPaymentV2: Payment still IN_FLIGHT...');
+          AppLogger.info('LND: trackPaymentV2: Payment still IN_FLIGHT...');
           // Continue listening
         }
       }
-      print('LND: trackPaymentV2: Stream ended without definitive status.');
+      AppLogger.info(
+          'LND: trackPaymentV2: Stream ended without definitive status.');
       return null;
     } catch (e) {
-      print('LND: Exception in trackPaymentV2 for $paymentHashHex: $e');
+      AppLogger.info(
+          'LND: Exception in trackPaymentV2 for $paymentHashHex: $e');
       return null;
     }
   }
@@ -366,7 +374,7 @@ class LndService implements PaymentService {
     if (_lightningClient == null) throw StateError('LND not connected.');
     final paymentHashBytes = _hexToBytes(paymentHashHex);
     final request = PaymentHash()..rHash = paymentHashBytes;
-    print('LND: Looking up invoice for hash: $paymentHashHex');
+    AppLogger.info('LND: Looking up invoice for hash: $paymentHashHex');
     try {
       final lndInvoice = await _lightningClient!.lookupInvoice(request);
       return InvoiceDetails(
@@ -391,7 +399,7 @@ class LndService implements PaymentService {
         // metadata: // LND htlcs could contain metadata, but not directly on Invoice object
       );
     } catch (e) {
-      print('LND: Error looking up invoice $paymentHashHex: $e');
+      AppLogger.info('LND: Error looking up invoice $paymentHashHex: $e');
       return InvoiceDetails(
         paymentHash: paymentHashHex,
         error: 'LND: Error looking up invoice: ${e.toString()}',

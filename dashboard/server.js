@@ -1,7 +1,9 @@
 const express = require('express');
-const { Pool } = require('pg');
+const http = require('http');
+const { Pool, Client } = require('pg');
 const cors = require('cors');
 const path = require('path');
+const { WebSocketServer, WebSocket } = require('ws');
 require('dotenv').config();
 
 // Helper to strip surrounding quotes from env vars (handles both Docker and non-Docker environments)
@@ -32,6 +34,7 @@ console.log('Database config:', {
 const app = express();
 app.use(cors());
 app.use(express.json());
+const server = http.createServer(app);
 
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, 'frontend/build')));
@@ -53,10 +56,346 @@ console.log('Attempting connection to database...');
 const pool = new Pool({
   connectionString: connectionString
 });
+
+const wsServer = new WebSocketServer({ server, path: '/ws/offers' });
+const wsClients = new Set();
+
+const RECENT_OFFERS_DEFAULT_LIMIT = 50;
+const RECENT_OFFERS_MAX_LIMIT = 200;
+const AUDIT_DEFAULT_LIMIT = 50;
+const AUDIT_MAX_LIMIT = 200;
+
+const parseLimit = (value, defaultValue, maxValue) => {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return defaultValue;
+  }
+  return Math.min(parsed, maxValue);
+};
+
+const fetchRecentOffers = async (limit = RECENT_OFFERS_DEFAULT_LIMIT) => {
+  const query = `
+    SELECT
+      id,
+      status,
+      amount_sats,
+      fiat_amount,
+      created_at,
+      updated_at,
+      reserved_at,
+      maker_confirmed_at,
+      settled_at,
+      taker_paid_at
+    FROM offers
+    ORDER BY COALESCE(updated_at, created_at) DESC
+    LIMIT $1
+  `;
+
+  const result = await pool.query(query, [limit]);
+  return result.rows;
+};
+
+const fetchOfferById = async (offerId) => {
+  const query = `
+    SELECT
+      id,
+      status,
+      amount_sats,
+      fiat_amount,
+      created_at,
+      updated_at,
+      reserved_at,
+      maker_confirmed_at,
+      settled_at,
+      taker_paid_at
+    FROM offers
+    WHERE id = $1
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [offerId]);
+  return result.rows[0] || null;
+};
+
+const fetchAuditByOfferId = async (offerId, limit = AUDIT_DEFAULT_LIMIT) => {
+  const query = `
+    SELECT
+      id,
+      offer_id,
+      action,
+      level,
+      logger_name,
+      message,
+      error,
+      stack_trace,
+      metadata,
+      created_at
+    FROM log_audit
+    WHERE offer_id = $1
+    ORDER BY created_at DESC, id DESC
+    LIMIT $2
+  `;
+
+  const result = await pool.query(query, [offerId, limit]);
+  return result.rows;
+};
+
+const fetchAuditById = async (auditId) => {
+  const query = `
+    SELECT
+      id,
+      offer_id,
+      action,
+      level,
+      logger_name,
+      message,
+      error,
+      stack_trace,
+      metadata,
+      created_at
+    FROM log_audit
+    WHERE id = $1
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [auditId]);
+  return result.rows[0] || null;
+};
+
+const sendToClient = (client, payload) => {
+  if (client.readyState === WebSocket.OPEN) {
+    client.send(JSON.stringify(payload));
+  }
+};
+
+const broadcast = (payload) => {
+  for (const client of wsClients) {
+    sendToClient(client, payload);
+  }
+};
+
+const sendRecentOffersSnapshot = async (client) => {
+  const offers = await fetchRecentOffers(RECENT_OFFERS_DEFAULT_LIMIT);
+  sendToClient(client, {
+    type: 'offers_snapshot',
+    offers
+  });
+};
+
+const setupRealtimeTriggers = async () => {
+  const triggerStatements = `
+    CREATE OR REPLACE FUNCTION notify_offers_change()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+      offer_id_value text;
+    BEGIN
+      offer_id_value := COALESCE(NEW.id::text, OLD.id::text);
+      PERFORM pg_notify(
+        'offers_changes',
+        json_build_object(
+          'operation', TG_OP,
+          'offer_id', offer_id_value
+        )::text
+      );
+
+      IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$;
+
+    DROP TRIGGER IF EXISTS offers_changes_trigger ON offers;
+    CREATE TRIGGER offers_changes_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON offers
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_offers_change();
+
+    CREATE OR REPLACE FUNCTION notify_log_audit_change()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+      offer_id_value text;
+      audit_id_value bigint;
+    BEGIN
+      offer_id_value := COALESCE(NEW.offer_id, OLD.offer_id);
+      audit_id_value := COALESCE(NEW.id, OLD.id);
+
+      PERFORM pg_notify(
+        'log_audit_changes',
+        json_build_object(
+          'operation', TG_OP,
+          'offer_id', offer_id_value,
+          'audit_id', audit_id_value
+        )::text
+      );
+
+      IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+      END IF;
+
+      RETURN NEW;
+    END;
+    $$;
+
+    DROP TRIGGER IF EXISTS log_audit_changes_trigger ON log_audit;
+    CREATE TRIGGER log_audit_changes_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON log_audit
+    FOR EACH ROW
+    EXECUTE FUNCTION notify_log_audit_change();
+  `;
+
+  await pool.query(triggerStatements);
+};
+
+const startRealtimeListener = async () => {
+  try {
+    await setupRealtimeTriggers();
+
+    const listenerClient = new Client({
+      connectionString: connectionString
+    });
+
+    await listenerClient.connect();
+    await listenerClient.query('LISTEN offers_changes');
+    await listenerClient.query('LISTEN log_audit_changes');
+
+    listenerClient.on('notification', async (message) => {
+      if (!message.payload) {
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(message.payload);
+
+        if (message.channel === 'offers_changes') {
+          if (!payload.offer_id) {
+            return;
+          }
+
+          const offer = await fetchOfferById(payload.offer_id);
+
+          if (offer) {
+            broadcast({
+              type: 'offer_changed',
+              offer,
+              operation: payload.operation
+            });
+          } else {
+            broadcast({
+              type: 'offer_removed',
+              offerId: payload.offer_id,
+              operation: payload.operation
+            });
+          }
+        }
+
+        if (message.channel === 'log_audit_changes') {
+          if (!payload.offer_id) {
+            return;
+          }
+
+          let auditEntry = null;
+          if (payload.audit_id) {
+            auditEntry = await fetchAuditById(payload.audit_id);
+          }
+
+          if (!auditEntry && payload.operation !== 'DELETE') {
+            const latest = await fetchAuditByOfferId(payload.offer_id, 1);
+            auditEntry = latest[0] || null;
+          }
+
+          broadcast({
+            type: 'audit_changed',
+            offerId: payload.offer_id,
+            operation: payload.operation,
+            audit: auditEntry
+          });
+        }
+      } catch (error) {
+        console.error('Failed to process realtime notification:', error);
+      }
+    });
+
+    listenerClient.on('error', (error) => {
+      console.error('PostgreSQL LISTEN client error:', error);
+    });
+
+    console.log('Realtime listener connected (LISTEN offers_changes, log_audit_changes)');
+  } catch (error) {
+    console.error('Failed to start realtime listener:', error);
+  }
+};
+
+wsServer.on('connection', async (socket) => {
+  wsClients.add(socket);
+
+  sendToClient(socket, {
+    type: 'connection',
+    status: 'connected'
+  });
+
+  try {
+    await sendRecentOffersSnapshot(socket);
+  } catch (error) {
+    console.error('Failed to send offers snapshot:', error);
+    sendToClient(socket, {
+      type: 'error',
+      message: 'Failed to fetch latest offers snapshot'
+    });
+  }
+
+  socket.on('message', async (raw) => {
+    try {
+      const parsed = JSON.parse(raw.toString());
+      if (parsed.type === 'refresh_offers') {
+        await sendRecentOffersSnapshot(socket);
+      }
+    } catch (error) {
+      console.error('Invalid websocket message:', error);
+    }
+  });
+
+  socket.on('close', () => {
+    wsClients.delete(socket);
+  });
+
+  socket.on('error', (error) => {
+    console.error('WebSocket client error:', error);
+  });
+});
 //
 //const pool = new Pool({
 //  connectionString: `postgresql://${process.env.DB_USER}:${encodeURIComponent(process.env.DB_PASSWORD)}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`
 //});
+
+
+app.get('/api/offers/recent', async (req, res) => {
+  try {
+    const limit = parseLimit(req.query.limit, RECENT_OFFERS_DEFAULT_LIMIT, RECENT_OFFERS_MAX_LIMIT);
+    const rows = await fetchRecentOffers(limit);
+    res.json({ rows });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/offers/:offerId/audit', async (req, res) => {
+  try {
+    const { offerId } = req.params;
+    const limit = parseLimit(req.query.limit, AUDIT_DEFAULT_LIMIT, AUDIT_MAX_LIMIT);
+    const rows = await fetchAuditByOfferId(offerId, limit);
+    res.json({ rows });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 
 app.post('/api/offers-data', async (req, res) => {
@@ -261,8 +600,10 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log(`- API endpoints: /api/*`);
+  console.log(`- WebSocket: ws://0.0.0.0:${PORT}/ws/offers`);
   console.log(`- Frontend served from: ${path.join(__dirname, 'frontend/build')}`);
+  await startRealtimeListener();
 });

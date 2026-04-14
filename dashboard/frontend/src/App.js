@@ -1,9 +1,44 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Calendar, TrendingUp, DollarSign, AlertCircle, Clock, Bitcoin } from 'lucide-react';
+import { Calendar, TrendingUp, DollarSign, AlertCircle, Clock, Bitcoin, List, BarChart3 } from 'lucide-react';
 import './App.css';
+import OffersPage from './pages/OffersPage';
 
-const OffersDashboard = () => {
+const Navigation = () => {
+  const location = useLocation();
+
+  return (
+    <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+      <div className="bg-white/90 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 px-2 py-1.5 flex gap-1">
+        <Link
+          to="/"
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+            location.pathname === '/'
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <BarChart3 size={16} />
+          Analytics
+        </Link>
+        <Link
+          to="/offers"
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+            location.pathname === '/offers'
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <List size={16} />
+          Offers
+        </Link>
+      </div>
+    </nav>
+  );
+};
+
+const AnalyticsDashboard = () => {
   const [data, setData] = useState([]);
   const [totals, setTotals] = useState(null);
   const [takerDomainRanking, setTakerDomainRanking] = useState([]);
@@ -87,6 +122,7 @@ const OffersDashboard = () => {
     // Refresh rate every 5 minutes (matching coordinator cache time)
     const interval = setInterval(fetchBtcPlnRate, 5 * 60 * 1000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch data from API
@@ -709,4 +745,18 @@ const OffersDashboard = () => {
   );
 };
 
-export default OffersDashboard;
+const App = () => {
+  return (
+    <BrowserRouter>
+      <Navigation />
+      <div className="pt-16">
+        <Routes>
+          <Route path="/" element={<AnalyticsDashboard />} />
+          <Route path="/offers" element={<OffersPage />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+};
+
+export default App;

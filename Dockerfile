@@ -24,7 +24,7 @@ ENV APP_VERSION=${APP_VERSION}
 RUN apk add --no-cache zlib
 RUN apk add --no-cache gmp
 #RUN apk add signal-cli=0.13.22-r0
-RUN apk add signal-cli~=0.13
+RUN apk add signal-cli~=0.14
 
 RUN apk add --no-cache sqlite-libs libstdc++
 RUN ln -s /usr/lib/libsqlite3.so.0 /usr/lib/libsqlite3.so

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../logging/app_logger.dart';
 
 class TelegramService {
   final String? _botToken;
@@ -19,7 +20,7 @@ class TelegramService {
 
   Future<bool> sendMessage(String message) async {
     if (!isConfigured) {
-      print(
+      AppLogger.info(
           'Telegram not configured: botToken or chatId missing. Skipping notification.');
       return false;
     }
@@ -38,15 +39,15 @@ class TelegramService {
       );
 
       if (response.statusCode == 200) {
-        print('Telegram notification sent successfully.');
+        AppLogger.info('Telegram notification sent successfully.');
         return true;
       } else {
-        print(
+        AppLogger.info(
             'Error sending Telegram notification: ${response.statusCode} ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Exception sending Telegram notification: $e');
+      AppLogger.info('Exception sending Telegram notification: $e');
       return false;
     }
   }

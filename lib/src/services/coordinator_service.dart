@@ -25,6 +25,7 @@ import '../models/invoice_status.dart';
 import '../models/invoice_update.dart';
 import 'nostr_service.dart';
 import 'telegram_service.dart';
+import '../logging/app_logger.dart';
 
 // Set to Duration.zero for production
 const Duration _kDebugDelayDuration = Duration(seconds: 0);
@@ -108,7 +109,7 @@ class CoordinatorService {
         return rate.toDouble();
       }
     } catch (e) {
-      print('Error parsing CoinGecko response: $e');
+      AppLogger.info('Error parsing CoinGecko response: $e');
     }
     return null;
   }
@@ -123,7 +124,7 @@ class CoordinatorService {
         return rate.toDouble();
       }
     } catch (e) {
-      print('Error parsing Yadio response: $e');
+      AppLogger.info('Error parsing Yadio response: $e');
     }
     return null;
   }
@@ -137,7 +138,7 @@ class CoordinatorService {
         return rate.toDouble();
       }
     } catch (e) {
-      print('Error parsing Blockchain.info response: $e');
+      AppLogger.info('Error parsing Blockchain.info response: $e');
     }
     return null;
   }
@@ -164,12 +165,12 @@ class CoordinatorService {
           validRates.reduce((a, b) => a + b) / validRates.length;
       _cachedPlnRate = averageRate;
       _cachedPlnRateTime = now;
-      print(
+      AppLogger.info(
           'Successfully fetched and averaged BTC/PLN rate: $averageRate from ${validRates.length} sources.');
       return averageRate;
     } else {
       if (_cachedPlnRate != null) {
-        print(
+        AppLogger.info(
             'Returning stale BTC/PLN rate due to all sources failing to fetch.');
         return _cachedPlnRate!;
       }
@@ -194,19 +195,19 @@ class CoordinatorService {
           rate = _parseBlockchainInfoResponse(response.body);
         }
         if (rate != null) {
-          print('Successfully fetched rate from $sourceName: $rate');
+          AppLogger.info('Successfully fetched rate from $sourceName: $rate');
           return rate;
         } else {
-          print('Failed to parse response from $sourceName');
+          AppLogger.info('Failed to parse response from $sourceName');
           return null;
         }
       } else {
-        print(
+        AppLogger.info(
             'Failed to fetch BTC/PLN rate from $sourceName: ${response.statusCode} ${response.body}');
         return null;
       }
     } catch (e) {
-      print('Error fetching BTC/PLN rate from $sourceName: $e');
+      AppLogger.info('Error fetching BTC/PLN rate from $sourceName: $e');
       return null;
     }
   }
@@ -294,15 +295,15 @@ class CoordinatorService {
           botToken: telegramBotToken,
           chatId: telegramChatId,
           httpClient: _httpClient);
-      print('Telegram service initialized.');
+      AppLogger.info('Telegram service initialized.');
       // } else {
-      //   print(
+      //   AppLogger.info(
       //       'Telegram not configured: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set. Skipping Telegram initialization.');
     }
 
     if (paymentServiceForTest != null) {
       _paymentBackend = paymentServiceForTest;
-      print(
+      AppLogger.info(
           'CoordinatorService initialized with injected payment backend for testing.');
       _paymentBackendType = "injected_test_backend";
     }
@@ -312,7 +313,8 @@ class CoordinatorService {
     if (_paymentBackend == null) {
       await _initializePaymentBackend();
     }
-    print('CoordinatorService initialized with $_paymentBackendType backend.');
+    AppLogger.info(
+        'CoordinatorService initialized with $_paymentBackendType backend.');
   }
 
   Future<void> doInitialCheckStatuses() async {
@@ -328,12 +330,12 @@ class CoordinatorService {
     if (_matrixUser.isEmpty ||
         _matrixPassword.isEmpty ||
         _matrixRoomId.isEmpty) {
-      print(
+      AppLogger.info(
           'Matrix credentials or Room ID not configured. Skipping Matrix initialization.');
       return;
     }
     try {
-      print(
+      AppLogger.info(
           'Initializing Matrix client for $_matrixUser on $_matrixHomeserver... client name: $_matrixClientName');
 
       // Initialize sqflite_common_ffi for server-side usage
@@ -354,7 +356,7 @@ class CoordinatorService {
         version: 1,
         onCreate: (db, version) async {
           // Let the matrix SDK handle database creation
-          print('Matrix database created at $dbPath');
+          AppLogger.info('Matrix database created at $dbPath');
         },
       );
 
@@ -379,10 +381,10 @@ class CoordinatorService {
         password: _matrixPassword,
       );
 
-      print(
+      AppLogger.info(
           'Matrix client logged in successfully as ${loginResponse.userId.localpart}');
     } catch (e) {
-      print('Error initializing or logging in Matrix client: $e');
+      AppLogger.info('Error initializing or logging in Matrix client: $e');
       _matrixClient = null;
     }
   }
@@ -392,18 +394,19 @@ class CoordinatorService {
     final lndHost = _env['LND_HOST'];
 
     if (nwcUri != null && nwcUri.isNotEmpty) {
-      print('NWC_URI found. Initializing NwcService...');
+      AppLogger.info('NWC_URI found. Initializing NwcService...');
       try {
         final nwcService = NwcService(nwcUri: nwcUri);
         await nwcService.connect();
         _paymentBackend = nwcService;
         _paymentBackendType = "nwc";
-        print('NwcService initialized and connected successfully.');
+        AppLogger.info('NwcService initialized and connected successfully.');
       } catch (e) {
-        print('Error initializing NwcService: $e');
+        AppLogger.info('Error initializing NwcService: $e');
         _paymentBackend = null; // Ensure backend is null on error
         _paymentBackendType = "none";
-        print('Falling back to LND check due to NWC initialization error.');
+        AppLogger.info(
+            'Falling back to LND check due to NWC initialization error.');
         if (lndHost != null && lndHost.isNotEmpty) {
           await _initializeLndService(lndHost);
         } else {
@@ -419,25 +422,25 @@ class CoordinatorService {
   }
 
   Future<void> _initializeLndService(String lndHost) async {
-    print(
+    AppLogger.info(
         'LND_HOST found ($lndHost). Initializing LndService (uses internal env vars for details)...');
     try {
       final lndService = LndService();
       await lndService.connect();
       _paymentBackend = lndService;
       _paymentBackendType = "lnd";
-      print('LndService initialized and connected successfully.');
+      AppLogger.info('LndService initialized and connected successfully.');
     } catch (e) {
-      print('Error initializing LndService: $e');
+      AppLogger.info('Error initializing LndService: $e');
       _paymentBackend = null; // Ensure backend is null on error
       _paymentBackendType = "none";
     }
   }
 
   Future<void> _checkExpiredFundedOffers() async {
-    print('Checking for expired funded offers on startup...');
+    AppLogger.info('Checking for expired funded offers on startup...');
     if (_paymentBackend == null) {
-      print(
+      AppLogger.info(
           "Skipping expired funded offers check: No payment backend configured.");
       return;
     }
@@ -452,23 +455,27 @@ class CoordinatorService {
         final createdAt = offer.createdAt;
         final expiryTime = createdAt.add(expirationDuration);
         if (now.isAfter(expiryTime)) {
-          print(
-              'Offer ${offer.id} funded expired (created at $createdAt, expired at $expiryTime). Cancelling.');
+          AppLogger.info(
+              'Offer ${offer.id} funded expired (created at $createdAt, expired at $expiryTime). Cancelling.',
+              offerId: offer.id);
           try {
             await _paymentBackend!
                 .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
-            print(
-                'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to startup expiration check.');
+            AppLogger.info(
+                'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to startup expiration check.',
+                offerId: offer.id);
           } catch (e) {
-            print(
-                'Error cancelling hold invoice for expired offer ${offer.id} using  $e');
+            AppLogger.info(
+                'Error cancelling hold invoice for expired offer ${offer.id} using  $e',
+                offerId: offer.id);
           }
           final dbSuccess =
               await _dbService.updateOfferStatus(offer.id, OfferStatus.expired);
           if (dbSuccess) {
             cancelledCount++;
-            print(
-                'Offer ${offer.id} status updated to expired in DB due to startup expiration check.');
+            AppLogger.info(
+                'Offer ${offer.id} status updated to expired in DB due to startup expiration check.',
+                offerId: offer.id);
 
             // Publish status update
             final expiredOffer = await _dbService.getOfferById(offer.id);
@@ -477,22 +484,23 @@ class CoordinatorService {
               await _nostrService?.broadcastNip69OrderFromOffer(expiredOffer);
             }
           } else {
-            print(
-                'Failed to update offer ${offer.id} status to expired in DB after startup expiration check.');
+            AppLogger.info(
+                'Failed to update offer ${offer.id} status to expired in DB after startup expiration check.',
+                offerId: offer.id);
           }
         }
       }
-      print(
+      AppLogger.info(
           'Expired funded offer check complete. Marked $cancelledCount offers as expired.');
     } catch (e) {
-      print('Error during expired funded offer check: $e');
+      AppLogger.info('Error during expired funded offer check: $e');
     }
   }
 
   Future<void> _checkTakerChargedAutoConfirm() async {
-    print('Checking for takerCharged auto confirm on startup...');
+    AppLogger.info('Checking for takerCharged auto confirm on startup...');
     if (_paymentBackend == null) {
-      print("Skipping, no payment backend configured.");
+      AppLogger.info("Skipping, no payment backend configured.");
       return;
     }
     try {
@@ -508,34 +516,37 @@ class CoordinatorService {
         // Use createdAt as the base for expiration since that's when the hold invoice was created
         final expiryTime = offer.createdAt.add(expirationDuration);
         if (now.isAfter(expiryTime)) {
-          print(
-              'Offer ${offer.id} takerCharged auto confirm (created at ${offer.createdAt}, expired at $expiryTime). Auto confirming.');
+          AppLogger.info(
+              'Offer ${offer.id} takerCharged auto confirm (created at ${offer.createdAt}, expired at $expiryTime). Auto confirming.',
+              offerId: offer.id);
           try {
             await confirmMakerPayment(offer.id, offer.makerPubkey);
             cancelledCount++;
           } catch (e) {
-            print(
-                'Error takerCharged auto confirming for offer ${offer.id} using  $e');
+            AppLogger.info(
+                'Error takerCharged auto confirming for offer ${offer.id} using  $e',
+                offerId: offer.id);
           }
         } else {
           // Restart timer for offers that haven't expired yet
-          print(
-              'Offer ${offer.id} still within takerCharged window (expires at $expiryTime). Restarting timer.');
+          AppLogger.info(
+              'Offer ${offer.id} still within takerCharged window (expires at $expiryTime). Restarting timer.',
+              offerId: offer.id);
           _startTakerChargedTimer(offer);
           timerRestartedCount++;
         }
       }
-      print(
+      AppLogger.info(
           'takerCharged auto confirm offer check complete. Auto confirmed $cancelledCount offers, restarted timers for $timerRestartedCount offers.');
     } catch (e) {
-      print('Error during takerCharged auto confirm check: $e');
+      AppLogger.info('Error during takerCharged auto confirm check: $e');
     }
   }
 
   Future<void> _checkConflictAutoDispute() async {
-    print('Checking for conflict auto dispute on startup...');
+    AppLogger.info('Checking for conflict auto dispute on startup...');
     if (_paymentBackend == null) {
-      print('Skipping, no payment backend configured.');
+      AppLogger.info('Skipping, no payment backend configured.');
       return;
     }
 
@@ -552,29 +563,31 @@ class CoordinatorService {
         final conflictStartAt = (offer.updatedAt ?? offer.createdAt).toUtc();
         final expiryTime = conflictStartAt.add(timeoutDuration);
         if (now.isAfter(expiryTime)) {
-          print(
-              'Offer ${offer.id} conflict timeout reached (entered conflict at $conflictStartAt, expired at $expiryTime). Opening dispute.');
+          AppLogger.info(
+              'Offer ${offer.id} conflict timeout reached (entered conflict at $conflictStartAt, expired at $expiryTime). Opening dispute.',
+              offerId: offer.id);
           final success = await openDispute(offer.id, offer.makerPubkey);
           if (success) {
             autoDisputedCount++;
           }
         } else {
-          print(
-              'Offer ${offer.id} still within conflict window (expires at $expiryTime). Restarting timer.');
+          AppLogger.info(
+              'Offer ${offer.id} still within conflict window (expires at $expiryTime). Restarting timer.',
+              offerId: offer.id);
           _startConflictTimer(offer);
           timerRestartedCount++;
         }
       }
 
-      print(
+      AppLogger.info(
           'Conflict auto dispute check complete. Auto disputed $autoDisputedCount offers, restarted timers for $timerRestartedCount offers.');
     } catch (e) {
-      print('Error during conflict auto dispute check: $e');
+      AppLogger.info('Error during conflict auto dispute check: $e');
     }
   }
 
   Future<void> _checkExpiredReservations() async {
-    print('Checking for expired reserved offers on startup...');
+    AppLogger.info('Checking for expired reserved offers on startup...');
     try {
       final reservedOffers =
           await _dbService.getOffersByStatus(OfferStatus.reserved, limit: 1000);
@@ -587,8 +600,9 @@ class CoordinatorService {
         if (offer.reservedAt != null) {
           final expiryTime = offer.reservedAt!.add(timeoutDuration);
           if (now.isAfter(expiryTime)) {
-            print(
-                'Offer ${offer.id} reservation expired (reserved at ${offer.reservedAt}, expired at $expiryTime). Reverting status.');
+            AppLogger.info(
+                'Offer ${offer.id} reservation expired (reserved at ${offer.reservedAt}, expired at $expiryTime). Reverting status.',
+                offerId: offer.id);
             final success = await _dbService.updateOfferStatus(
               offer.id,
               OfferStatus.funded,
@@ -609,12 +623,15 @@ class CoordinatorService {
               _startFundedOfferTimer(
                   offer); // offer object is available from the loop
             } else {
-              print('Error reverting expired offer ${offer.id} on startup.');
+              AppLogger.info(
+                  'Error reverting expired offer ${offer.id} on startup.',
+                  offerId: offer.id);
             }
           }
         } else {
-          print(
-              'Warning: Offer ${offer.id} is reserved but has no reserved_at timestamp. Reverting.');
+          AppLogger.info(
+              'Warning: Offer ${offer.id} is reserved but has no reserved_at timestamp. Reverting.',
+              offerId: offer.id);
           final success = await _dbService.updateOfferStatus(
             offer.id,
             OfferStatus.funded,
@@ -628,20 +645,21 @@ class CoordinatorService {
             _startFundedOfferTimer(
                 offer); // offer object is available from the loop
           } else {
-            print(
-                'Error reverting reserved offer ${offer.id} with missing timestamp on startup.');
+            AppLogger.info(
+                'Error reverting reserved offer ${offer.id} with missing timestamp on startup.',
+                offerId: offer.id);
           }
         }
       }
-      print(
+      AppLogger.info(
           'Expired reservation check complete. Reverted $revertedCount offers.');
     } catch (e) {
-      print('Error during expired reservation check: $e');
+      AppLogger.info('Error during expired reservation check: $e');
     }
   }
 
   Future<void> _checkExpiredBlikConfirmations() async {
-    print(
+    AppLogger.info(
         '### COORDINATOR: Running _checkExpiredBlikConfirmations on startup...');
     try {
       final offersToCheck = [
@@ -663,8 +681,9 @@ class CoordinatorService {
             final newStatus = offer.status == OfferStatus.blikReceived
                 ? OfferStatus.expiredBlik
                 : OfferStatus.expiredSentBlik;
-            print(
-                'Offer ${offer.id} BLIK confirmation expired (BLIK received at ${offer.blikReceivedAt}, expired at $expiryTime). Transitioning to $newStatus.');
+            AppLogger.info(
+                'Offer ${offer.id} BLIK confirmation expired (BLIK received at ${offer.blikReceivedAt}, expired at $expiryTime). Transitioning to $newStatus.',
+                offerId: offer.id);
             final success = await _dbService.updateOfferStatus(
               offer.id,
               newStatus,
@@ -682,13 +701,15 @@ class CoordinatorService {
                 await _publishStatusUpdate(expiredOffer);
               }
             } else {
-              print(
-                  'Error updating expired BLIK confirmation for offer ${offer.id} on startup.');
+              AppLogger.info(
+                  'Error updating expired BLIK confirmation for offer ${offer.id} on startup.',
+                  offerId: offer.id);
             }
           }
         } else {
-          print(
-              'Warning: Offer ${offer.id} is in state ${offer.status} but has no blik_received_at timestamp. Transitioning to expired status.');
+          AppLogger.info(
+              'Warning: Offer ${offer.id} is in state ${offer.status} but has no blik_received_at timestamp. Transitioning to expired status.',
+              offerId: offer.id);
           // Determine the appropriate expired status based on current status
           final newStatus = offer.status == OfferStatus.blikReceived
               ? OfferStatus.expiredBlik
@@ -709,15 +730,16 @@ class CoordinatorService {
               await _publishStatusUpdate(expiredOffer);
             }
           } else {
-            print(
-                'Error updating offer ${offer.id} with missing BLIK timestamp on startup.');
+            AppLogger.info(
+                'Error updating offer ${offer.id} with missing BLIK timestamp on startup.',
+                offerId: offer.id);
           }
         }
       }
-      print(
+      AppLogger.info(
           'Expired BLIK confirmation check complete. Expired $expiredCount offers.');
     } catch (e) {
-      print('Error during expired BLIK confirmation check: $e');
+      AppLogger.info('Error during expired BLIK confirmation check: $e');
     }
   }
 
@@ -726,7 +748,7 @@ class CoordinatorService {
     required String makerId,
     String fiatCurrency = 'PLN',
   }) async {
-    print(
+    AppLogger.info(
         'Initiating offer: fiatAmount=$fiatAmount $fiatCurrency, maker=$makerId');
     final rate = await _getPlnRate();
     final btcPerPln = 1 / rate;
@@ -749,7 +771,8 @@ class CoordinatorService {
     String returnedPaymentHashHex = paymentHashHex;
 
     if (_paymentBackend == null) {
-      print('CRITICAL: No payment backend configured for initiateOfferFiat.');
+      AppLogger.info(
+          'CRITICAL: No payment backend configured for initiateOfferFiat.');
       throw Exception("No payment backend configured to create hold invoice.");
     }
 
@@ -774,7 +797,8 @@ class CoordinatorService {
       'fiatCurrency': fiatCurrency,
       'actualPaymentHashForSubscription': returnedPaymentHashHex,
     };
-    print('Pending offer stored for payment hash $returnedPaymentHashHex');
+    AppLogger.info(
+        'Pending offer stored for payment hash $returnedPaymentHashHex');
     _startInvoiceSubscription(returnedPaymentHashHex);
     return {
       'holdInvoice': holdInvoice,
@@ -790,10 +814,10 @@ class CoordinatorService {
 
   void _startInvoiceSubscription(String paymentHashHex) {
     _invoiceSubscriptions[paymentHashHex]?.cancel();
-    print('Starting subscription for invoice: $paymentHashHex');
+    AppLogger.info('Starting subscription for invoice: $paymentHashHex');
 
     if (_paymentBackend == null) {
-      print(
+      AppLogger.info(
           'CRITICAL: No payment backend configured for _startInvoiceSubscription.');
       _pendingOffers.remove(paymentHashHex);
       return;
@@ -804,35 +828,37 @@ class CoordinatorService {
           .subscribeToInvoiceUpdates(paymentHashHex: paymentHashHex)
           .listen(
         (InvoiceUpdate update) async {
-          print(
+          AppLogger.info(
               '$_paymentBackendType Invoice Update for $paymentHashHex: Status=${update.status}');
           if (update.status == InvoiceStatus.ACCEPTED) {
-            print(
+            AppLogger.info(
                 '$_paymentBackendType Invoice ACCEPTED (funded): $paymentHashHex');
             await _createOfferFromFundedInvoice(paymentHashHex);
             _invoiceSubscriptions[paymentHashHex]?.cancel();
             _invoiceSubscriptions.remove(paymentHashHex);
           } else if (update.status == InvoiceStatus.CANCELED) {
-            print('$_paymentBackendType Invoice CANCELED: $paymentHashHex');
+            AppLogger.info(
+                '$_paymentBackendType Invoice CANCELED: $paymentHashHex');
             _pendingOffers.remove(paymentHashHex);
             _invoiceSubscriptions[paymentHashHex]?.cancel();
             _invoiceSubscriptions.remove(paymentHashHex);
           } else if (update.status == InvoiceStatus.SETTLED) {
             // This case might be less common for hold invoices before BLIK,
             // but good to handle if the backend sends it.
-            print('$_paymentBackendType Invoice SETTLED: $paymentHashHex');
+            AppLogger.info(
+                '$_paymentBackendType Invoice SETTLED: $paymentHashHex');
             _invoiceSubscriptions[paymentHashHex]?.cancel();
             _invoiceSubscriptions.remove(paymentHashHex);
           }
         },
         onError: (error) {
-          print(
+          AppLogger.info(
               'Error in $_paymentBackendType subscription stream for $paymentHashHex: $error');
           _pendingOffers.remove(paymentHashHex);
           _invoiceSubscriptions.remove(paymentHashHex);
         },
         onDone: () {
-          print(
+          AppLogger.info(
               '$_paymentBackendType Subscription stream closed for $paymentHashHex');
           // For NWC, onDone might not mean the end of the world if it's a shared stream.
           // However, for a specific invoice subscription, it usually means it's over.
@@ -848,7 +874,7 @@ class CoordinatorService {
       );
       _invoiceSubscriptions[paymentHashHex] = subscription;
     } catch (e) {
-      print(
+      AppLogger.info(
           'Failed to initiate $_paymentBackendType subscription for $paymentHashHex: $e');
       _pendingOffers.remove(paymentHashHex);
     }
@@ -857,20 +883,21 @@ class CoordinatorService {
   Future<void> _createOfferFromFundedInvoice(String paymentHashHex) async {
     final pendingData = _pendingOffers.remove(paymentHashHex);
     if (pendingData == null) {
-      print(
+      AppLogger.info(
           'Warning: _createOfferFromFundedInvoice called for unknown or already processed payment hash: $paymentHashHex');
       final existingOffer =
           await _dbService.getOfferByPaymentHash(paymentHashHex);
       if (existingOffer == null) {
-        print(
+        AppLogger.info(
             'Error: No pending data and no existing offer found for funded hash: $paymentHashHex');
       } else {
-        print('Offer already exists for funded hash: $paymentHashHex');
+        AppLogger.info('Offer already exists for funded hash: $paymentHashHex');
       }
       return;
     }
 
-    print('Creating offer in DB for funded payment hash: $paymentHashHex');
+    AppLogger.info(
+        'Creating offer in DB for funded payment hash: $paymentHashHex');
     try {
       final offer = Offer(
         amountSats: pendingData['amountSats'],
@@ -932,9 +959,10 @@ class CoordinatorService {
         await Future.wait(notificationFutures, eagerError: false);
       }
 
-      print('Offer ${offer.id} created successfully in DB.');
+      AppLogger.info('Offer ${offer.id} created successfully in DB.',
+          offerId: offer.id);
     } catch (e) {
-      print('Error creating offer in DB for $paymentHashHex: $e');
+      AppLogger.info('Error creating offer in DB for $paymentHashHex: $e');
     }
   }
 
@@ -944,26 +972,26 @@ class CoordinatorService {
       final simplexMsg = "#'$_simplexGroup' $notificationText";
       final result = await run('$_simplexChatExec -e "$simplexMsg" --ha');
       if (result.first.stderr.isNotEmpty) {
-        print('simplex command error: ${result.first.stderr}');
+        AppLogger.info('simplex command error: ${result.first.stderr}');
       }
     } catch (e) {
-      print('Error sending SimpleX notification: $e');
+      AppLogger.info('Error sending SimpleX notification: $e');
     }
   }
 
   /// Send Matrix notification (returns Future for parallel execution)
   Future<void> _sendMatrixNotification(String notificationText) async {
     try {
-      print('Sending Matrix notification to room $_matrixRoomId');
+      AppLogger.info('Sending Matrix notification to room $_matrixRoomId');
       final room = _matrixClient!.getRoomById(_matrixRoomId);
       if (room == null) {
-        print('Error: Could not find Matrix room $_matrixRoomId');
+        AppLogger.info('Error: Could not find Matrix room $_matrixRoomId');
       } else {
         await room.sendTextEvent(notificationText);
-        print('Matrix notification sent successfully.');
+        AppLogger.info('Matrix notification sent successfully.');
       }
     } catch (e) {
-      print('Error sending Matrix notification: $e');
+      AppLogger.info('Error sending Matrix notification: $e');
     }
   }
 
@@ -972,7 +1000,7 @@ class CoordinatorService {
     try {
       await _telegramService!.sendMessage(notificationText);
     } catch (e) {
-      print('Error sending Telegram notification: $e');
+      AppLogger.info('Error sending Telegram notification: $e');
     }
   }
 
@@ -983,12 +1011,12 @@ class CoordinatorService {
           '$_signalCliExec send -g $_signalGroupId -m "$notificationText"';
       final result = await run(signalCmd);
       if (result.first.stderr.isNotEmpty) {
-        print('signal-cli command error: ${result.first.stderr}');
+        AppLogger.info('signal-cli command error: ${result.first.stderr}');
       } else {
-        print('Signal notification sent successfully.');
+        AppLogger.info('Signal notification sent successfully.');
       }
     } catch (e) {
-      print('Error sending Signal notification: $e');
+      AppLogger.info('Error sending Signal notification: $e');
     }
   }
 
@@ -1001,16 +1029,19 @@ class CoordinatorService {
     final remainingDuration = expirationTime.difference(now);
 
     if (remainingDuration.isNegative || remainingDuration.inSeconds == 0) {
-      print(
-          'Offer ${offer.id} has already passed its expiration time. Handling expiration immediately.');
+      AppLogger.info(
+          'Offer ${offer.id} has already passed its expiration time. Handling expiration immediately.',
+          offerId: offer.id);
       // Ensure it's not processed in a tight loop if already handled
       _fundedOfferTimers.remove(offer.id);
       _handleFundedOfferExpiration(offer);
     } else {
-      print(
-          'Starting funded offer expiration timer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s');
+      AppLogger.info(
+          'Starting funded offer expiration timer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s',
+          offerId: offer.id);
       _fundedOfferTimers[offer.id] = Timer(remainingDuration, () {
-        print('Funded offer timer expired for offer ${offer.id}');
+        AppLogger.info('Funded offer timer expired for offer ${offer.id}',
+            offerId: offer.id);
         _handleFundedOfferExpiration(offer);
         _fundedOfferTimers.remove(offer.id);
       });
@@ -1018,40 +1049,45 @@ class CoordinatorService {
   }
 
   Future<void> _handleFundedOfferExpiration(Offer offer) async {
-    print('Handling funded offer expiration for offer ${offer.id}');
+    AppLogger.info('Handling funded offer expiration for offer ${offer.id}',
+        offerId: offer.id);
     if (offer.status == OfferStatus.funded) {
       if (_paymentBackend != null) {
         try {
           await _paymentBackend!
               .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
-          print(
-              'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to expiration.');
+          AppLogger.info(
+              'Hold invoice for offer ${offer.id} cancelled via $_paymentBackendType due to expiration.',
+              offerId: offer.id);
           sleep(Duration(seconds: 1));
           final invoiceDetails = await _paymentBackend!
               .lookupInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
           // TODO this will not work for NWC, we need to handle it
           if (invoiceDetails.status == InvoiceStatus.CANCELED) {
-            print(
+            AppLogger.info(
                 'Verified invoice ${offer.holdInvoicePaymentHash} is cancelled via $_paymentBackendType.');
           } else {
-            print(
+            AppLogger.info(
                 'Warning: Invoice ${offer.holdInvoicePaymentHash} status is ${invoiceDetails.status}, expected CANCELED.');
             return; // Exit if cancellation fails
           }
         } catch (e) {
-          print(
-              'Error cancelling hold invoice for expired offer ${offer.id} using  $e');
+          AppLogger.info(
+              'Error cancelling hold invoice for expired offer ${offer.id} using  $e',
+              offerId: offer.id);
           return; // Exit if cancellation fails
         }
       } else {
-        print(
-            'CRITICAL: No payment backend to cancel invoice for expired offer ${offer.id}.');
+        AppLogger.info(
+            'CRITICAL: No payment backend to cancel invoice for expired offer ${offer.id}.',
+            offerId: offer.id);
       }
       final dbSuccess =
           await _dbService.updateOfferStatus(offer.id, OfferStatus.expired);
       if (dbSuccess) {
-        print(
-            'Offer ${offer.id} status updated to expired in DB due to expiration.');
+        AppLogger.info(
+            'Offer ${offer.id} status updated to expired in DB due to expiration.',
+            offerId: offer.id);
 
         // Publish status update
         final expiredOffer = await _dbService.getOfferById(offer.id);
@@ -1060,19 +1096,22 @@ class CoordinatorService {
           await _nostrService?.broadcastNip69OrderFromOffer(expiredOffer);
         }
       } else {
-        print(
-            'Failed to update offer ${offer.id} status to expired in DB after expiration.');
+        AppLogger.info(
+            'Failed to update offer ${offer.id} status to expired in DB after expiration.',
+            offerId: offer.id);
       }
     } else {
-      print(
-          'Offer ${offer.id} is no longer funded (current status: ${offer.status}). No action needed for funded expiration.');
+      AppLogger.info(
+          'Offer ${offer.id} is no longer funded (current status: ${offer.status}). No action needed for funded expiration.',
+          offerId: offer.id);
     }
   }
 
   void _startTakerChargedTimer(Offer offer) {
     if (offer.status != OfferStatus.takerCharged) {
-      print(
-          'Error: Cannot start taker charged timer for offer ${offer.id} - not in state takerCharged, status is ${offer.status}');
+      AppLogger.info(
+          'Error: Cannot start taker charged timer for offer ${offer.id} - not in state takerCharged, status is ${offer.status}',
+          offerId: offer.id);
       return;
     }
     _takerChargedTimers[offer.id]?.cancel();
@@ -1084,17 +1123,20 @@ class CoordinatorService {
     final remainingDuration = expirationTime.difference(now);
 
     if (remainingDuration.isNegative || remainingDuration.inSeconds == 0) {
-      print(
-          'Offer ${offer.id} has already passed its expiration time. Handling expiration immediately.');
+      AppLogger.info(
+          'Offer ${offer.id} has already passed its expiration time. Handling expiration immediately.',
+          offerId: offer.id);
       // Ensure it's not processed in a tight loop if already handled
       _takerChargedTimers.remove(offer.id);
       _handleTakerChargedAutoConfirmation(offer);
     } else {
-      print(
-          'Starting taker charged auto confirmationtimer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s');
+      AppLogger.info(
+          'Starting taker charged auto confirmationtimer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s',
+          offerId: offer.id);
       _takerChargedTimers[offer.id] = Timer(remainingDuration, () {
-        print(
-            'taker charged auto confirmation timer expired for offer ${offer.id}');
+        AppLogger.info(
+            'taker charged auto confirmation timer expired for offer ${offer.id}',
+            offerId: offer.id);
         _handleTakerChargedAutoConfirmation(offer);
         _takerChargedTimers.remove(offer.id);
       });
@@ -1103,8 +1145,9 @@ class CoordinatorService {
 
   void _startConflictTimer(Offer offer) {
     if (offer.status != OfferStatus.conflict) {
-      print(
-          'Error: Cannot start conflict timer for offer ${offer.id} - not in state conflict, status is ${offer.status}');
+      AppLogger.info(
+          'Error: Cannot start conflict timer for offer ${offer.id} - not in state conflict, status is ${offer.status}',
+          offerId: offer.id);
       return;
     }
 
@@ -1117,45 +1160,54 @@ class CoordinatorService {
     final remainingDuration = expirationTime.difference(now);
 
     if (remainingDuration.isNegative || remainingDuration.inSeconds == 0) {
-      print(
-          'Offer ${offer.id} has already passed conflict timeout. Handling auto dispute immediately.');
+      AppLogger.info(
+          'Offer ${offer.id} has already passed conflict timeout. Handling auto dispute immediately.',
+          offerId: offer.id);
       _conflictTimers.remove(offer.id);
       _handleConflictTimeout(offer.id);
       return;
     }
 
-    print(
-        'Starting conflict auto dispute timer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s');
+    AppLogger.info(
+        'Starting conflict auto dispute timer for offer ${offer.id} with remaining duration: ${remainingDuration.inSeconds}s',
+        offerId: offer.id);
     _conflictTimers[offer.id] = Timer(remainingDuration, () {
-      print('Conflict timer expired for offer ${offer.id}');
+      AppLogger.info('Conflict timer expired for offer ${offer.id}',
+          offerId: offer.id);
       _conflictTimers.remove(offer.id);
       _handleConflictTimeout(offer.id);
     });
   }
 
   Future<void> _handleConflictTimeout(String offerId) async {
-    print('Handling conflict timeout for offer $offerId');
+    AppLogger.info('Handling conflict timeout for offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null) {
-      print('Offer $offerId not found while handling conflict timeout.');
+      AppLogger.info(
+          'Offer $offerId not found while handling conflict timeout.',
+          offerId: offerId);
       return;
     }
     if (offer.status != OfferStatus.conflict) {
-      print(
-          'Offer $offerId is no longer in conflict (current status: ${offer.status}). No action needed for conflict timeout.');
+      AppLogger.info(
+          'Offer $offerId is no longer in conflict (current status: ${offer.status}). No action needed for conflict timeout.',
+          offerId: offerId);
       return;
     }
 
     final success = await openDispute(offerId, offer.makerPubkey);
     if (!success) {
-      print(
-          'Failed to auto-open dispute for offer $offerId after conflict timeout.');
+      AppLogger.info(
+          'Failed to auto-open dispute for offer $offerId after conflict timeout.',
+          offerId: offerId);
     }
   }
 
   Future<void> _handleTakerChargedAutoConfirmation(Offer offer) async {
-    print(
-        'Handling taker charged auto confirmation expiration for offer ${offer.id}');
+    AppLogger.info(
+        'Handling taker charged auto confirmation expiration for offer ${offer.id}',
+        offerId: offer.id);
     if (offer.status == OfferStatus.takerCharged) {
       if (_paymentBackend != null) {
         try {
@@ -1166,17 +1218,18 @@ class CoordinatorService {
                 'Failed to confirm payment. Check offer state, LND connection, or logs.');
           }
         } catch (e) {
-          print(
+          AppLogger.info(
               'Error auto confirming offer after $_takerChargedAutoConfirmTimeoutSeconds seconds in status taker charged $e');
           return; // Exit if cancellation fails
         }
       } else {
-        print(
+        AppLogger.info(
             'CRITICAL: No payment backend auto confirm offer in status takerCharged.');
       }
     } else {
-      print(
-          'Offer ${offer.id} is no longer in takerCharged status (current status: ${offer.status}). No action needed for takerCharged auto confirmation expiration');
+      AppLogger.info(
+          'Offer ${offer.id} is no longer in takerCharged status (current status: ${offer.status}). No action needed for takerCharged auto confirmation expiration',
+          offerId: offer.id);
     }
   }
 
@@ -1220,22 +1273,23 @@ class CoordinatorService {
   // --- Other API Endpoint Logic ---
 
   Future<List<Offer>> getMyActiveOffers(String userPubkey) async {
-    // print('Fetching active offers for user: $userPubkey');
+    // AppLogger.info('Fetching active offers for user: $userPubkey');
     return await _dbService.getMyActiveOffers(userPubkey);
   }
 
   Future<Offer?> getOfferByPaymentHash(String paymentHash) async {
-    // print('Fetching offer by payment hash: $paymentHash');
+    // AppLogger.info('Fetching offer by payment hash: $paymentHash');
     return await _dbService.getOfferByPaymentHash(paymentHash);
   }
 
   Future<Offer?> getOfferById(String offerId) async {
-    // print('Fetching offer by ID: $offerId');
+    // AppLogger.info('Fetching offer by ID: $offerId', offerId: offerId);
     return await _dbService.getOfferById(offerId);
   }
 
   Future<DateTime?> reserveOffer(String offerId, String takerId) async {
-    print('Reserving offer $offerId for taker $takerId');
+    AppLogger.info('Reserving offer $offerId for taker $takerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
         (offer.status != OfferStatus.funded &&
@@ -1245,8 +1299,9 @@ class CoordinatorService {
         ((offer.status == OfferStatus.invalidBlik ||
                 offer.status == OfferStatus.expiredBlik) &&
             offer.takerPubkey != takerId)) {
-      print(
-          'Offer $offerId not found or not available for reservation status:${offer?.status}.');
+      AppLogger.info(
+          'Offer $offerId not found or not available for reservation status:${offer?.status}.',
+          offerId: offerId);
       _fundedOfferTimers[offerId]?.cancel();
       _fundedOfferTimers.remove(offerId);
       return null;
@@ -1263,8 +1318,9 @@ class CoordinatorService {
     );
 
     if (success) {
-      print(
-          'Offer $offerId reserved successfully, DB timestamp set to $timestampToStore.');
+      AppLogger.info(
+          'Offer $offerId reserved successfully, DB timestamp set to $timestampToStore.',
+          offerId: offerId);
       _fundedOfferTimers[offerId]?.cancel();
       _fundedOfferTimers.remove(offerId);
       _startReservationTimer(offerId);
@@ -1278,18 +1334,21 @@ class CoordinatorService {
 
       return timestampToStore;
     } else {
-      print('Failed to reserve offer $offerId in DB.');
+      AppLogger.info('Failed to reserve offer $offerId in DB.',
+          offerId: offerId);
       return null;
     }
   }
 
   void _startReservationTimer(String offerId) {
     _reservationTimers[offerId]?.cancel();
-    print(
-        'Starting $_reservationTimeoutSeconds\s reservation timer for offer $offerId');
+    AppLogger.info(
+        'Starting $_reservationTimeoutSeconds\s reservation timer for offer $offerId',
+        offerId: offerId);
     _reservationTimers[offerId] =
         Timer(Duration(seconds: _reservationTimeoutSeconds), () {
-      print('Reservation timer expired for offer $offerId');
+      AppLogger.info('Reservation timer expired for offer $offerId',
+          offerId: offerId);
       _handleReservationTimeout(offerId);
       _reservationTimers.remove(offerId);
     });
@@ -1297,7 +1356,8 @@ class CoordinatorService {
 
   // New private method to handle reverting an offer to funded state
   Future<bool> _revertOfferToFunded(String offerId) async {
-    print('Reverting offer $offerId to funded state.');
+    AppLogger.info('Reverting offer $offerId to funded state.',
+        offerId: offerId);
     final success = await _dbService.updateOfferStatus(
       offerId,
       OfferStatus.funded,
@@ -1307,27 +1367,32 @@ class CoordinatorService {
       reservedAt: null, // Ensure reservedAt is cleared
     );
     if (success) {
-      print('Offer $offerId successfully reverted to funded.');
+      // AppLogger.info('Offer $offerId successfully reverted to funded.',
+      //     offerId: offerId);
       // Restart the funded offer timer
       final offer = await _dbService.getOfferById(offerId);
       if (offer != null) {
         _startFundedOfferTimer(offer);
       } else {
-        print(
-            'Error: Could not find offer $offerId after reverting to funded to restart timer.');
+        AppLogger.info(
+            'Error: Could not find offer $offerId after reverting to funded to restart timer.',
+            offerId: offerId);
       }
     } else {
-      print('Error reverting offer $offerId to funded in DB.');
+      AppLogger.info('Error reverting offer $offerId to funded in DB.',
+          offerId: offerId);
     }
     return success;
   }
 
   Future<void> _handleReservationTimeout(String offerId) async {
-    print('Handling reservation timeout for offer $offerId');
+    AppLogger.info('Handling reservation timeout for offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer != null && offer.status == OfferStatus.reserved) {
-      print(
-          'Offer $offerId is still reserved. Reverting status to funded due to timeout.');
+      AppLogger.info(
+          'Offer $offerId is still reserved. Reverting status to funded due to timeout.',
+          offerId: offerId);
       final reverted = await _revertOfferToFunded(offerId);
       if (reverted) {
         // Publish status update
@@ -1338,26 +1403,30 @@ class CoordinatorService {
         }
       }
     } else {
-      print(
-          'Offer $offerId no longer reserved (current status: ${offer?.status}). No action needed for reservation timeout.');
+      AppLogger.info(
+          'Offer $offerId no longer reserved (current status: ${offer?.status}). No action needed for reservation timeout.',
+          offerId: offerId);
     }
   }
 
   void _startBlikConfirmationTimer(String offerId) {
     _blikConfirmationTimers[offerId]?.cancel();
-    print(
-        '### COORDINATOR: Starting 120s BLIK confirmation timer for offer $offerId');
+    AppLogger.info(
+        '### COORDINATOR: Starting 120s BLIK confirmation timer for offer $offerId',
+        offerId: offerId);
     _blikConfirmationTimers[offerId] = Timer(const Duration(seconds: 120), () {
-      print(
-          '### COORDINATOR: Raw timer expired for offer $offerId. Calling handler...');
+      AppLogger.info(
+          '### COORDINATOR: Raw timer expired for offer $offerId. Calling handler...',
+          offerId: offerId);
       _handleBlikConfirmationTimeout(offerId);
       _blikConfirmationTimers.remove(offerId);
     });
   }
 
   Future<void> _handleBlikConfirmationTimeout(String offerId) async {
-    print(
-        '### COORDINATOR: Handling BLIK confirmation timeout for offer $offerId');
+    AppLogger.info(
+        '### COORDINATOR: Handling BLIK confirmation timeout for offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer != null &&
         (offer.status == OfferStatus.blikReceived ||
@@ -1365,8 +1434,9 @@ class CoordinatorService {
       final newStatus = offer.status == OfferStatus.blikReceived
           ? OfferStatus.expiredBlik
           : OfferStatus.expiredSentBlik;
-      print(
-          'Offer ${offer.id} BLIK confirmation timed out (status: ${offer.status}). Transitioning to $newStatus');
+      AppLogger.info(
+          'Offer ${offer.id} BLIK confirmation timed out (status: ${offer.status}). Transitioning to $newStatus',
+          offerId: offer.id);
       final success = await _dbService.updateOfferStatus(
         offerId,
         newStatus,
@@ -1376,8 +1446,9 @@ class CoordinatorService {
         blikReceivedAt: null,
       );
       if (success) {
-        print(
-            'Offer $offerId status reverted to $newStatus to BLIK confirmation timeout.');
+        AppLogger.info(
+            'Offer $offerId status reverted to $newStatus to BLIK confirmation timeout.',
+            offerId: offerId);
 
         // Publish status update
         final revertedOffer = await _dbService.getOfferById(offerId);
@@ -1388,36 +1459,43 @@ class CoordinatorService {
         // TODO start 60min timer to settle the invoice
         //_startFundedOfferTimer(offer);
       } else {
-        print(
-            'Error reverting offer $offerId status after BLIK confirmation timeout.');
+        AppLogger.info(
+            'Error reverting offer $offerId status after BLIK confirmation timeout.',
+            offerId: offerId);
       }
     } else {
-      print(
-          'Offer $offerId no longer awaiting BLIK confirmation (current status: ${offer?.status}). No action needed for BLIK timeout.');
+      AppLogger.info(
+          'Offer $offerId no longer awaiting BLIK confirmation (current status: ${offer?.status}). No action needed for BLIK timeout.',
+          offerId: offerId);
     }
   }
 
   Future<bool> submitBlikCode(String offerId, String takerId, String blikCode,
       String? takerLightningAddress, String? takerInvoice) async {
-    print('Submitting BLIK $blikCode for offer $offerId by taker $takerId');
+    AppLogger.info(
+        'Submitting BLIK $blikCode for offer $offerId by taker $takerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
         offer.status != OfferStatus.reserved ||
         offer.takerPubkey != takerId) {
-      print('Offer $offerId not found, not reserved, or taker mismatch.');
+      AppLogger.info(
+          'Offer $offerId not found, not reserved, or taker mismatch.',
+          offerId: offerId);
       return false;
     }
 
     final netAmountSats = offer.amountSats -
         (offer.takerFees ??
             (offer.amountSats * _takerFeePercentage / 100).ceil());
-    print(
+    AppLogger.info(
         'Calculated net amount for taker invoice: $netAmountSats sats (Original: ${offer.amountSats}, Fee: ${offer.takerFees})');
 
     if (takerInvoice == null) {
       if (takerLightningAddress == null || takerLightningAddress.isEmpty) {
-        print(
-            'Cannot resolve LNURL invoice for offer $offerId: missing takerLightningAddress and takerInvoice.');
+        AppLogger.info(
+            'Cannot resolve LNURL invoice for offer $offerId: missing takerLightningAddress and takerInvoice.',
+            offerId: offerId);
         return false;
       }
       takerInvoice =
@@ -1438,25 +1516,27 @@ class CoordinatorService {
       }
     }
     if (takerInvoice == null || takerInvoice.isEmpty) {
-      print(
+      AppLogger.info(
           'Could not get an invoice for net amount $netAmountSats sats for LN address $takerLightningAddress');
       return false;
     }
     // The following line seems to be a copy-paste error, the condition is already checked above.
-    // print('Offer $offerId not found, not reserved, or taker mismatch.');
+    // AppLogger.info('Offer $offerId not found, not reserved, or taker mismatch.', offerId: offerId);
 
     _reservationTimers[offerId]?.cancel();
     _reservationTimers.remove(offerId);
-    print(
-        'Cancelled reservation timer for offer $offerId due to BLIK submission.');
+    AppLogger.info(
+        'Cancelled reservation timer for offer $offerId due to BLIK submission.',
+        offerId: offerId);
 
     final blikReceivedTime = DateTime.now().toUtc();
 
     final invoiceStored =
         await _dbService.updateTakerInvoice(offerId, takerInvoice);
     if (!invoiceStored) {
-      print(
-          'Failed to persist taker invoice for offer $offerId. Rejecting BLIK submission.');
+      AppLogger.info(
+          'Failed to persist taker invoice for offer $offerId. Rejecting BLIK submission.',
+          offerId: offerId);
       return false;
     }
 
@@ -1467,7 +1547,7 @@ class CoordinatorService {
         blikReceivedAt: blikReceivedTime);
 
     if (success) {
-      print('BLIK code for offer $offerId stored.');
+      AppLogger.info('BLIK code for offer $offerId stored.', offerId: offerId);
       _startBlikConfirmationTimer(offerId);
 
       // Publish status update
@@ -1476,26 +1556,30 @@ class CoordinatorService {
         await _publishStatusUpdate(updatedOffer);
       }
     } else {
-      print('Failed to store BLIK code for offer $offerId in DB.');
+      AppLogger.info('Failed to store BLIK code for offer $offerId in DB.',
+          offerId: offerId);
     }
     return success;
   }
 
   Future<String?> getBlikCodeForMaker(String offerId, String makerId) async {
-    print('Maker $makerId requesting BLIK for offer $offerId');
+    AppLogger.info('Maker $makerId requesting BLIK for offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
         offer.makerPubkey != makerId ||
         offer.blikCode == null) {
-      print(
-          'Offer $offerId not found, maker mismatch, status not blikReceived/blikSentToMaker, or no BLIK code available.');
+      AppLogger.info(
+          'Offer $offerId not found, maker mismatch, status not blikReceived/blikSentToMaker, or no BLIK code available.',
+          offerId: offerId);
       return null;
     }
     // Allow fetching if status is blikReceived OR blikSentToMaker
     if (offer.status != OfferStatus.blikReceived &&
         offer.status != OfferStatus.blikSentToMaker) {
-      print(
-          'Offer $offerId not in correct state (${offer.status}) to provide BLIK code to maker.');
+      AppLogger.info(
+          'Offer $offerId not in correct state (${offer.status}) to provide BLIK code to maker.',
+          offerId: offerId);
       return null;
     }
 
@@ -1505,10 +1589,12 @@ class CoordinatorService {
         final statusUpdated = await _dbService.updateOfferStatus(
             offerId, OfferStatus.blikSentToMaker);
         if (!statusUpdated) {
-          print(
-              'Warning: Failed to update offer $offerId status to blikSentToMaker, but returning code anyway.');
+          AppLogger.info(
+              'Warning: Failed to update offer $offerId status to blikSentToMaker, but returning code anyway.',
+              offerId: offerId);
         } else {
-          print('Offer $offerId status updated to blikSentToMaker.');
+          AppLogger.info('Offer $offerId status updated to blikSentToMaker.',
+              offerId: offerId);
 
           // Publish status update
           final updatedOffer = await _dbService.getOfferById(offerId);
@@ -1529,8 +1615,9 @@ class CoordinatorService {
         final remaining = timeoutDuration - elapsed;
         if (remaining > Duration.zero) {
           _blikConfirmationTimers[offerId] = Timer(remaining, () {
-            print(
-                '### COORDINATOR: Raw timer expired for offer $offerId. Calling handler...');
+            AppLogger.info(
+                '### COORDINATOR: Raw timer expired for offer $offerId. Calling handler...',
+                offerId: offerId);
             _handleBlikConfirmationTimeout(offerId);
             _blikConfirmationTimers.remove(offerId);
           });
@@ -1543,34 +1630,41 @@ class CoordinatorService {
         _startBlikConfirmationTimer(offerId);
       }
     } catch (e) {
-      print('Error during getBlikCodeForMaker for offer $offerId: $e');
+      AppLogger.info('Error during getBlikCodeForMaker for offer $offerId: $e',
+          offerId: offerId);
     }
 
-    print('Returning BLIK code for offer $offerId to maker.');
+    AppLogger.info('Returning BLIK code for offer $offerId to maker.',
+        offerId: offerId);
     return offer.blikCode;
   }
 
   Future<bool> markBlikInvalid(String offerId, String makerId) async {
-    print('Maker $makerId marking BLIK as invalid for offer $offerId');
+    AppLogger.warning('Maker $makerId marking BLIK as invalid for offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
 
     if (offer == null || offer.makerPubkey != makerId) {
-      print(
-          'Offer $offerId not found or maker ID mismatch for marking BLIK invalid.');
+      AppLogger.warning(
+          'Offer $offerId not found or maker ID mismatch for marking BLIK invalid.',
+          offerId: offerId);
       return false;
     }
 
     if (offer.status != OfferStatus.takerCharged &&
         offer.status != OfferStatus.blikSentToMaker &&
         offer.status != OfferStatus.expiredSentBlik) {
-      print(
-          'Offer $offerId is not in a state where BLIK can be marked invalid (current state: ${offer.status}).');
+      AppLogger.warning(
+          'Offer $offerId is not in a state where BLIK can be marked invalid (current state: ${offer.status}).',
+          offerId: offerId);
       return false;
     }
 
     _blikConfirmationTimers[offerId]?.cancel();
     _blikConfirmationTimers.remove(offerId);
-    print('Cancelled BLIK confirmation timer for offer $offerId (if active).');
+    // AppLogger.info(
+    //     'Cancelled BLIK confirmation timer for offer $offerId (if active).',
+    //     offerId: offerId);
 
     final newStatus = offer.status != OfferStatus.takerCharged
         ? OfferStatus.invalidBlik
@@ -1579,7 +1673,8 @@ class CoordinatorService {
     final success = await _dbService.updateOfferStatus(offerId, newStatus);
 
     if (success) {
-      print('Offer $offerId status updated to $newStatus.');
+      AppLogger.info('Offer $offerId status updated to $newStatus.',
+          offerId: offerId);
 
       // Publish status update
       final updatedOffer = await _dbService.getOfferById(offerId);
@@ -1593,25 +1688,30 @@ class CoordinatorService {
         }
       }
     } else {
-      print('Failed to update offer $offerId status to $newStatus in DB.');
+      AppLogger.warning(
+          'Failed to update offer $offerId status to $newStatus in DB.',
+          offerId: offerId);
     }
     return success;
   }
 
   Future<bool> markBlikCharged(String offerId, String takerId) async {
-    print('Taker $takerId marking offer $offerId as charged.');
+    AppLogger.info('Taker $takerId marking offer $offerId as charged.',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
 
     if (offer == null || offer.takerPubkey != takerId) {
-      print(
-          'Offer $offerId not found or taker ID mismatch for marking conflict.');
+      AppLogger.info(
+          'Offer $offerId not found or taker ID mismatch for marking conflict.',
+          offerId: offerId);
       return false;
     }
 
     if (offer.status != OfferStatus.invalidBlik &&
         offer.status != OfferStatus.expiredSentBlik) {
-      print(
-          'Offer $offerId is in wrong state (current state: ${offer.status}). Cannot mark as charged.');
+      AppLogger.info(
+          'Offer $offerId is in wrong state (current state: ${offer.status}). Cannot mark as charged.',
+          offerId: offerId);
       return false;
     }
 
@@ -1621,7 +1721,8 @@ class CoordinatorService {
     final success = await _dbService.updateOfferStatus(offerId, newStatus);
 
     if (success) {
-      print('Offer $offerId status updated to $newStatus.');
+      AppLogger.info('Offer $offerId status updated to $newStatus.',
+          offerId: offerId);
 
       // Publish status update
       final updatedOffer = await _dbService.getOfferById(offerId);
@@ -1639,41 +1740,49 @@ class CoordinatorService {
         _startTakerChargedTimer(updatedOffer);
       }
     } else {
-      print('Failed to update offer $offerId status to $newStatus in DB.');
+      AppLogger.info(
+          'Failed to update offer $offerId status to $newStatus in DB.',
+          offerId: offerId);
     }
     return success;
   }
 
   Future<bool> openDispute(String offerId, String makerId) async {
-    print('Maker $makerId marking offer $offerId as dispute.');
+    AppLogger.info('Maker $makerId marking offer $offerId as dispute.',
+        offerId: offerId);
     _conflictTimers[offerId]?.cancel();
     _conflictTimers.remove(offerId);
     final offer = await _dbService.getOfferById(offerId);
 
     if (offer == null || offer.makerPubkey != makerId) {
-      print(
-          'Offer $offerId not found or maker ID mismatch for opening dispute.');
+      AppLogger.info(
+          'Offer $offerId not found or maker ID mismatch for opening dispute.',
+          offerId: offerId);
       return false;
     }
 
     if (offer.status != OfferStatus.conflict) {
-      print(
-          'Offer $offerId is not in the conflict state (current state: ${offer.status}). Cannot mark as open dispute.');
+      AppLogger.info(
+          'Offer $offerId is not in the conflict state (current state: ${offer.status}). Cannot mark as open dispute.',
+          offerId: offerId);
       return false;
     }
     try {
       if (_paymentBackend != null) {
         await _paymentBackend!
             .settleInvoice(preimageHex: offer.holdInvoicePreimage);
-        print(
-            'Hold invoice for offer $offerId settled successfully via $_paymentBackendType.');
+        AppLogger.info(
+            'Hold invoice for offer $offerId settled successfully via $_paymentBackendType.',
+            offerId: offerId);
       } else {
-        print(
-            'CRITICAL: No payment backend to settle invoice for offer $offerId.');
+        AppLogger.info(
+            'CRITICAL: No payment backend to settle invoice for offer $offerId.',
+            offerId: offerId);
         throw Exception("No payment backend to settle invoice.");
       }
     } catch (e) {
-      print('Error settling hold invoice for offer $offerId: $e');
+      AppLogger.info('Error settling hold invoice for offer $offerId: $e',
+          offerId: offerId);
       // ....
       return false;
     }
@@ -1682,7 +1791,8 @@ class CoordinatorService {
         await _dbService.updateOfferStatus(offerId, OfferStatus.dispute);
 
     if (success) {
-      print('Offer $offerId status updated to dispute.');
+      AppLogger.info('Offer $offerId status updated to dispute.',
+          offerId: offerId);
 
       // Publish status update
       final updatedOffer = await _dbService.getOfferById(offerId);
@@ -1691,13 +1801,15 @@ class CoordinatorService {
         await _nostrService?.broadcastNip69OrderFromOffer(updatedOffer);
       }
     } else {
-      print('Failed to update offer $offerId status to dispute in DB.');
+      AppLogger.info('Failed to update offer $offerId status to dispute in DB.',
+          offerId: offerId);
     }
     return success;
   }
 
   Future<bool> confirmMakerPayment(String offerId, String makerId) async {
-    print('Maker $makerId confirming payment for offer $offerId');
+    AppLogger.info('Maker $makerId confirming payment for offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null ||
         offer.makerPubkey != makerId ||
@@ -1714,8 +1826,9 @@ class CoordinatorService {
                 OfferStatus
                     .expiredSentBlik // Allow confirmation from expiredSentBlik state
         )) {
-      print(
-          'Offer $offerId not found, maker mismatch, or not in correct state for confirmation (current: ${offer?.status}).');
+      AppLogger.info(
+          'Offer $offerId not found, maker mismatch, or not in correct state for confirmation (current: ${offer?.status}).',
+          offerId: offerId);
       return false;
     }
 
@@ -1725,15 +1838,20 @@ class CoordinatorService {
     _blikConfirmationTimers.remove(offerId);
     _conflictTimers[offerId]?.cancel();
     _conflictTimers.remove(offerId);
-    print('Cancelled timers for offer $offerId during maker confirmation.');
+    AppLogger.info(
+        'Cancelled timers for offer $offerId during maker confirmation.',
+        offerId: offerId);
 
     bool success =
         await _dbService.updateOfferStatus(offerId, OfferStatus.makerConfirmed);
     if (!success) {
-      print('Failed to update offer $offerId status to makerConfirmed in DB.');
+      AppLogger.info(
+          'Failed to update offer $offerId status to makerConfirmed in DB.',
+          offerId: offerId);
       return false;
     }
-    print('Offer $offerId status updated to makerConfirmed.');
+    AppLogger.info('Offer $offerId status updated to makerConfirmed.',
+        offerId: offerId);
 
     final updatedOffer = await _dbService.getOfferById(offerId);
     if (updatedOffer != null) {
@@ -1744,18 +1862,22 @@ class CoordinatorService {
       if (_paymentBackend != null) {
         await _paymentBackend!
             .settleInvoice(preimageHex: offer.holdInvoicePreimage);
-        print(
-            'Hold invoice for offer $offerId settled successfully via $_paymentBackendType.');
+        AppLogger.info(
+            'Hold invoice for offer $offerId settled successfully via $_paymentBackendType.',
+            offerId: offerId);
       } else {
-        print(
-            'CRITICAL: No payment backend to settle invoice for offer $offerId.');
+        AppLogger.info(
+            'CRITICAL: No payment backend to settle invoice for offer $offerId.',
+            offerId: offerId);
         throw Exception("No payment backend to settle invoice.");
       }
       await Future.delayed(_kDebugDelayDuration);
       success =
           await _dbService.updateOfferStatus(offerId, OfferStatus.settled);
       if (!success) {
-        print('Failed to update offer $offerId status to settled in DB.');
+        AppLogger.info(
+            'Failed to update offer $offerId status to settled in DB.',
+            offerId: offerId);
       } else {
         // Publish status update
         final settledOffer = await _dbService.getOfferById(offerId);
@@ -1764,7 +1886,8 @@ class CoordinatorService {
         }
       }
     } catch (e) {
-      print('Error settling hold invoice for offer $offerId: $e');
+      AppLogger.info('Error settling hold invoice for offer $offerId: $e',
+          offerId: offerId);
       // Potentially revert makerConfirmed status or set to a failed state
       return false;
     }
@@ -1775,40 +1898,50 @@ class CoordinatorService {
 
   Future<bool> updateTakerInvoice(
       String offerId, String takerInvoice, String userPubkey) async {
-    print('Updating taker invoice for offer $offerId by user $userPubkey');
+    AppLogger.info(
+        'Updating taker invoice for offer $offerId by user $userPubkey',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null) {
-      print('Offer $offerId not found.');
+      AppLogger.info('Offer $offerId not found.', offerId: offerId);
       return false;
     }
     if (offer.takerPubkey != userPubkey) {
-      print('User pubkey mismatch for updating taker invoice.');
+      AppLogger.info('User pubkey mismatch for updating taker invoice.');
       return false;
     }
     final success = await _dbService.updateTakerInvoice(offerId, takerInvoice);
     if (success) {
-      print('Taker invoice updated for offer $offerId.');
+      AppLogger.info('Taker invoice updated for offer $offerId.',
+          offerId: offerId);
     } else {
-      print('Failed to update taker invoice for offer $offerId.');
+      AppLogger.info('Failed to update taker invoice for offer $offerId.',
+          offerId: offerId);
     }
     return success;
   }
 
   Future<bool> cancelReservation(String offerId, String takerId) async {
-    print('Taker $takerId attempting to cancel reservation for offer $offerId');
+    AppLogger.info(
+        'Taker $takerId attempting to cancel reservation for offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null) {
-      print('Offer $offerId not found.');
+      AppLogger.info('Offer $offerId not found.', offerId: offerId);
       return false;
     }
     if (offer.takerPubkey != takerId) {
-      print('Taker mismatch for cancelling reservation on offer $offerId.');
+      AppLogger.info(
+          'Taker mismatch for cancelling reservation on offer $offerId.',
+          offerId: offerId);
       return false;
     }
     if (offer.status != OfferStatus.reserved &&
         offer.status != OfferStatus.expiredBlik &&
         offer.status != OfferStatus.invalidBlik) {
-      print('Offer $offerId cannot be cancelled in status ${offer.status}.');
+      AppLogger.info(
+          'Offer $offerId cannot be cancelled in status ${offer.status}.',
+          offerId: offerId);
       _reservationTimers[offerId]?.cancel();
       _reservationTimers.remove(offerId);
       return false;
@@ -1821,7 +1954,8 @@ class CoordinatorService {
     final reverted = await _revertOfferToFunded(offerId);
 
     if (reverted) {
-      print('Reservation for offer $offerId cancelled by taker.');
+      AppLogger.info('Reservation for offer $offerId cancelled by taker.',
+          offerId: offerId);
 
       // Publish status update
       final revertedOffer = await _dbService.getOfferById(offerId);
@@ -1832,25 +1966,30 @@ class CoordinatorService {
 
       return true;
     } else {
-      print(
-          'Failed to cancel reservation for offer $offerId (DB update failed).');
+      AppLogger.info(
+          'Failed to cancel reservation for offer $offerId (DB update failed).',
+          offerId: offerId);
       return false;
     }
   }
 
   Future<bool> cancelOffer(String offerId, String makerId) async {
-    print('Maker $makerId attempting to cancel offer $offerId');
+    AppLogger.info('Maker $makerId attempting to cancel offer $offerId',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null) {
-      print('Offer $offerId not found.');
+      AppLogger.info('Offer $offerId not found.', offerId: offerId);
       return false;
     }
     if (offer.makerPubkey != makerId) {
-      print('Maker mismatch for cancelling offer $offerId.');
+      AppLogger.info('Maker mismatch for cancelling offer $offerId.',
+          offerId: offerId);
       return false;
     }
     if (offer.status != OfferStatus.funded) {
-      print('Offer $offerId cannot be cancelled in status ${offer.status}.');
+      AppLogger.info(
+          'Offer $offerId cannot be cancelled in status ${offer.status}.',
+          offerId: offerId);
       _fundedOfferTimers[offerId]?.cancel();
       _fundedOfferTimers.remove(offerId);
       return false;
@@ -1863,19 +2002,24 @@ class CoordinatorService {
       try {
         await _paymentBackend!
             .cancelInvoice(paymentHashHex: offer.holdInvoicePaymentHash);
-        print(
-            'Hold invoice for offer $offerId cancelled successfully via $_paymentBackendType.');
+        AppLogger.info(
+            'Hold invoice for offer $offerId cancelled successfully via $_paymentBackendType.',
+            offerId: offerId);
       } catch (e) {
-        print('Error cancelling hold invoice for offer $offerId using  $e');
+        AppLogger.info(
+            'Error cancelling hold invoice for offer $offerId using  $e',
+            offerId: offerId);
       }
     } else {
-      print(
-          'CRITICAL: No payment backend to cancel invoice for offer $offerId.');
+      AppLogger.info(
+          'CRITICAL: No payment backend to cancel invoice for offer $offerId.',
+          offerId: offerId);
     }
 
     final dbSuccess = await _dbService.cancelOffer(offerId, makerId);
     if (dbSuccess) {
-      print('Offer $offerId status updated to cancelled in DB.');
+      AppLogger.info('Offer $offerId status updated to cancelled in DB.',
+          offerId: offerId);
 
       // Publish status update
       final cancelledOffer = await _dbService.getOfferById(offerId);
@@ -1889,21 +2033,26 @@ class CoordinatorService {
       _pendingOffers.remove(offer.holdInvoicePaymentHash);
       return true;
     } else {
-      print('Failed to update offer $offerId status to cancelled in DB.');
+      AppLogger.info(
+          'Failed to update offer $offerId status to cancelled in DB.',
+          offerId: offerId);
       return false;
     }
   }
 
   Future<void> _payTakerAsync(String offerId) async {
-    print('Starting async taker payment process for offer $offerId...');
+    AppLogger.info('Starting async taker payment process for offer $offerId...',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null) {
-      print('Async Error: Offer $offerId not found for taker payment.');
+      AppLogger.info('Async Error: Offer $offerId not found for taker payment.',
+          offerId: offerId);
       return;
     }
     if (offer.status != OfferStatus.settled) {
-      print(
-          'Async Error: Offer $offerId not in settled state (state is ${offer.status}). Cannot pay taker.');
+      AppLogger.info(
+          'Async Error: Offer $offerId not in settled state (state is ${offer.status}). Cannot pay taker.',
+          offerId: offerId);
       return;
     }
 
@@ -1916,8 +2065,9 @@ class CoordinatorService {
     if (takerInvoice == null || takerInvoice.isEmpty) {
       if (offer.takerLightningAddress == null ||
           offer.takerLightningAddress!.isEmpty) {
-        print(
-            'Async Error: Missing both taker invoice and Lightning Address for offer $offerId.');
+        AppLogger.info(
+            'Async Error: Missing both taker invoice and Lightning Address for offer $offerId.',
+            offerId: offerId);
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
         final failedOffer = await _dbService.getOfferById(offerId);
@@ -1927,11 +2077,12 @@ class CoordinatorService {
         return;
       }
 
-      print(
+      AppLogger.info(
           'Async: No stored taker invoice. Attempting LNURL resolution for ${offer.takerLightningAddress} and net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
     } else {
-      print(
-          'Async: Using stored taker invoice for offer $offerId and net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)');
+      AppLogger.info(
+          'Async: Using stored taker invoice for offer $offerId and net amount $netAmountSats sats (Original: ${offer.amountSats}, Fee: $takerFees)',
+          offerId: offerId);
     }
 
     try {
@@ -1939,8 +2090,9 @@ class CoordinatorService {
         takerInvoice =
             await _resolveLnurlPay(offer.takerLightningAddress!, netAmountSats);
         if (takerInvoice == null || takerInvoice.isEmpty) {
-          print(
-              'Async Error: Failed to resolve LNURL for net amount $netAmountSats for offer $offerId.');
+          AppLogger.info(
+              'Async Error: Failed to resolve LNURL for net amount $netAmountSats for offer $offerId.',
+              offerId: offerId);
           await _dbService.updateOfferStatus(
               offerId, OfferStatus.takerPaymentFailed);
           final failedOffer = await _dbService.getOfferById(offerId);
@@ -1953,13 +2105,16 @@ class CoordinatorService {
         bool invoiceStored =
             await _dbService.updateTakerInvoice(offerId, takerInvoice);
         if (!invoiceStored) {
-          print(
-              'Async Warning: Failed to store resolved taker invoice for offer $offerId. Proceeding with payment attempt.');
+          AppLogger.info(
+              'Async Warning: Failed to store resolved taker invoice for offer $offerId. Proceeding with payment attempt.',
+              offerId: offerId);
         }
       }
       await _sendTakerPayment(offerId, takerInvoice);
     } catch (e) {
-      print('Async Exception during taker payment for offer $offerId: $e');
+      AppLogger.info(
+          'Async Exception during taker payment for offer $offerId: $e',
+          offerId: offerId);
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
       final failedOffer = await _dbService.getOfferById(offerId);
@@ -1970,11 +2125,13 @@ class CoordinatorService {
   }
 
   Future<String?> _sendTakerPayment(String offerId, String takerInvoice) async {
-    print('Attempting to send taker payment for offer $offerId...');
+    AppLogger.info('Attempting to send taker payment for offer $offerId...',
+        offerId: offerId);
     try {
       final offer = await _dbService.getOfferById(offerId);
       if (offer == null) {
-        print('Offer $offerId not found for taker payment.');
+        AppLogger.info('Offer $offerId not found for taker payment.',
+            offerId: offerId);
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
         return "invalid offer";
@@ -1991,19 +2148,22 @@ class CoordinatorService {
       // Calculate taker fees (configurable % of the original offer amount)
       final takerFees = (offer.amountSats * _takerFeePercentage / 100).ceil();
       final netAmountSats = offer.amountSats - takerFees;
-      print(
-          'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.');
+      AppLogger.info(
+          'Calculated taker fees for offer $offerId: $takerFees sats. Paying net amount: $netAmountSats sats.',
+          offerId: offerId);
 
       if (_paymentBackend == null) {
-        print('CRITICAL: No payment backend configured for _sendTakerPayment.');
+        AppLogger.info(
+            'CRITICAL: No payment backend configured for _sendTakerPayment.');
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
         return 'No payment backend configured.';
       }
 
       final feeLimitSat = (offer.takerFees! * kTakerFeeLimitFactor).ceil();
-      print(
-          ' Attempting to pay invoice for offer $offerId. Amount: $netAmountSats sats, Fee limit: $feeLimitSat sats.');
+      AppLogger.info(
+          ' Attempting to pay invoice for offer $offerId. Amount: $netAmountSats sats, Fee limit: $feeLimitSat sats.',
+          offerId: offerId);
 
       final paymentResult = await _paymentBackend!.payInvoice(
         invoice: takerInvoice,
@@ -2012,15 +2172,17 @@ class CoordinatorService {
       );
 
       if (paymentResult.isSuccess) {
-        print(
-            ' Successfully paid taker for offer $offerId. Preimage: ${paymentResult.paymentPreimage}');
+        AppLogger.info(
+            ' Successfully paid taker for offer $offerId. Preimage: ${paymentResult.paymentPreimage}',
+            offerId: offerId);
         await Future.delayed(_kDebugDelayDuration);
         await _dbService.updateOfferStatus(offerId, OfferStatus.takerPaid,
             takerFees: takerFees);
         await _dbService.updateTakerInvoiceFees(
             offerId, paymentResult.feeSat ?? 0);
-        print(
-            ' Updated taker invoice fees to ${paymentResult.feeSat ?? 0} sats for offer $offerId.');
+        AppLogger.info(
+            ' Updated taker invoice fees to ${paymentResult.feeSat ?? 0} sats for offer $offerId.',
+            offerId: offerId);
 
         // Publish status update
         final paidOffer = await _dbService.getOfferById(offerId);
@@ -2031,8 +2193,9 @@ class CoordinatorService {
 
         return null; // Success
       } else {
-        print(
-            ' Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}');
+        AppLogger.info(
+            ' Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}',
+            offerId: offerId);
         await _dbService.updateOfferStatus(
             offerId, OfferStatus.takerPaymentFailed);
 
@@ -2045,8 +2208,9 @@ class CoordinatorService {
         return ' Failed to pay taker for offer $offerId. Reason: ${paymentResult.paymentError}';
       }
     } catch (e) {
-      print(
-          'Exception during taker payment for offer $offerId (using $_paymentBackendType): $e');
+      AppLogger.info(
+          'Exception during taker payment for offer $offerId (using $_paymentBackendType): $e',
+          offerId: offerId);
       await _dbService.updateOfferStatus(
           offerId, OfferStatus.takerPaymentFailed);
       // Publish status update
@@ -2059,18 +2223,21 @@ class CoordinatorService {
   }
 
   Future<String?> retryTakerPayment(String offerId, String userPubkey) async {
-    print('Retrying taker payment for offer $offerId by user $userPubkey');
+    AppLogger.info(
+        'Retrying taker payment for offer $offerId by user $userPubkey',
+        offerId: offerId);
     final offer = await _dbService.getOfferById(offerId);
     if (offer == null) {
-      print('Offer $offerId not found.');
+      AppLogger.info('Offer $offerId not found.', offerId: offerId);
       return "invalid offer";
     }
     if (offer.takerPubkey != userPubkey) {
-      print('User pubkey mismatch for retrying taker payment.');
+      AppLogger.info('User pubkey mismatch for retrying taker payment.');
       return "not your offer";
     }
     if (offer.takerInvoice == null || offer.takerInvoice!.isEmpty) {
-      print('No taker invoice available for offer $offerId.');
+      AppLogger.info('No taker invoice available for offer $offerId.',
+          offerId: offerId);
       return "No taker invoice in offer";
     }
     return await _sendTakerPayment(offerId, offer.takerInvoice!);
@@ -2099,28 +2266,28 @@ class CoordinatorService {
       String lightningAddress, int netAmountSats) async {
     try {
       if (!lightningAddress.contains('@')) {
-        print('Invalid Lightning Address format: $lightningAddress');
+        AppLogger.info('Invalid Lightning Address format: $lightningAddress');
         return null;
       }
       final parts = lightningAddress.split('@');
       final username = parts[0];
       final domain = parts[1];
       final lnurlpUrl = Uri.https(domain, '/.well-known/lnurlp/$username');
-      print('LNURL: Requesting step 1 from $lnurlpUrl');
+      AppLogger.info('LNURL: Requesting step 1 from $lnurlpUrl');
       final response1 = await _httpClient.get(lnurlpUrl); // Use _httpClient
       if (response1.statusCode != 200) {
-        print(
+        AppLogger.info(
             'LNURL Error: Step 1 request failed (${response1.statusCode}) for $lightningAddress: ${response1.body}');
         return null;
       }
       final data1 = jsonDecode(response1.body) as Map<String, dynamic>;
       if (data1['status'] == 'ERROR') {
-        print(
+        AppLogger.info(
             'LNURL Error: Service returned error in step 1 for $lightningAddress: ${data1['reason']}');
         return null;
       }
       if (data1['tag'] != 'payRequest') {
-        print(
+        AppLogger.info(
             'LNURL Error: Invalid tag in step 1 response for $lightningAddress: ${data1['tag']}');
         return null;
       }
@@ -2128,13 +2295,13 @@ class CoordinatorService {
       final minSendable = data1['minSendable'] as int?;
       final maxSendable = data1['maxSendable'] as int?;
       if (callbackUrl == null || minSendable == null || maxSendable == null) {
-        print(
+        AppLogger.info(
             'LNURL Error: Missing required fields (callback, min/maxSendable) in step 1 for $lightningAddress');
         return null;
       }
       final amountMsats = netAmountSats * 1000;
       if (amountMsats < minSendable || amountMsats > maxSendable) {
-        print(
+        AppLogger.info(
             'LNURL Error: Net amount $netAmountSats sats ($amountMsats msats) is outside acceptable range ($minSendable - $maxSendable msats) for $lightningAddress');
         return null;
       }
@@ -2142,29 +2309,30 @@ class CoordinatorService {
       final queryParams = Map<String, String>.from(callbackUri.queryParameters);
       queryParams['amount'] = amountMsats.toString();
       final finalUrl = callbackUri.replace(queryParameters: queryParams);
-      print('LNURL: Requesting step 2 from $finalUrl');
+      AppLogger.info('LNURL: Requesting step 2 from $finalUrl');
       final response2 = await _httpClient.get(finalUrl); // Use _httpClient
       if (response2.statusCode != 200) {
-        print(
+        AppLogger.info(
             'LNURL Error: Step 2 request failed (${response2.statusCode}) for $lightningAddress: ${response2.body}');
         return null;
       }
       final data2 = jsonDecode(response2.body) as Map<String, dynamic>;
       if (data2['status'] == 'ERROR') {
-        print(
+        AppLogger.info(
             'LNURL Error: Service returned error in step 2 for $lightningAddress: ${data2['reason']}');
         return null;
       }
       final invoice = data2['pr'] as String?;
       if (invoice == null) {
-        print(
+        AppLogger.info(
             'LNURL Error: Missing invoice ("pr" field) in step 2 response for $lightningAddress');
         return null;
       }
-      print('LNURL Success: Resolved invoice for $lightningAddress');
+      AppLogger.info('LNURL Success: Resolved invoice for $lightningAddress');
       return invoice;
     } catch (e) {
-      print('Exception during LNURL resolution for $lightningAddress: $e');
+      AppLogger.info(
+          'Exception during LNURL resolution for $lightningAddress: $e');
       return null;
     }
   }
@@ -2173,13 +2341,14 @@ class CoordinatorService {
   void setNostrService(NostrService nostrService) {
     _nostrService = nostrService;
 
-    print('Nostr service set for status update publishing');
+    AppLogger.info('Nostr service set for status update publishing');
   }
 
   /// Publish offer status update via Nostr
   Future<void> _publishStatusUpdate(Offer offer) async {
     if (_nostrService == null) {
-      print('Nostr service not available, skipping status update publication');
+      AppLogger.info(
+          'Nostr service not available, skipping status update publication');
       return;
     }
 
@@ -2195,12 +2364,13 @@ class CoordinatorService {
         takerPubkey: offer.takerPubkey,
       );
     } catch (e) {
-      print('Error publishing status update for offer ${offer.id}: $e');
+      AppLogger.info('Error publishing status update for offer ${offer.id}: $e',
+          offerId: offer.id);
     }
   }
 
   Future<Map<String, dynamic>> getSuccessfulOffersWithStats() async {
-    print('Fetching successful offers with stats...');
+    AppLogger.info('Fetching successful offers with stats...');
     final allSuccessfulOffers = await _dbService.getOffersByStatus(
         OfferStatus.takerPaid,
         limit: 10000); // Fetch a large number for stats for calculations
