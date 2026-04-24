@@ -454,7 +454,7 @@ app.post('/api/offers-data', async (req, res) => {
         ROUND(COALESCE(AVG(taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0), 2) AS avg_taker_invoice_fees,
         ROUND(
           COALESCE(
-            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats, 0)) FILTER (WHERE status = 'takerPaid'),
+            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats - taker_fees, 0)) FILTER (WHERE status = 'takerPaid'),
             0
           ) * 100,
           2
@@ -486,7 +486,7 @@ app.post('/api/offers-data', async (req, res) => {
         ROUND(COALESCE(AVG(taker_invoice_fees) FILTER (WHERE status = 'takerPaid'), 0), 2) AS overall_avg_taker_invoice_fees,
         ROUND(
           COALESCE(
-            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats, 0)) FILTER (WHERE status = 'takerPaid'),
+            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats - taker_fees, 0)) FILTER (WHERE status = 'takerPaid'),
             0
           ) * 100,
           2
@@ -501,7 +501,7 @@ app.post('/api/offers-data', async (req, res) => {
         COUNT(*) AS offer_count,
         ROUND(
           COALESCE(
-            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats, 0)) FILTER (WHERE status = 'takerPaid'),
+            AVG(taker_invoice_fees * 100.0 / NULLIF(amount_sats - taker_fees, 0)) FILTER (WHERE status = 'takerPaid'),
             0
           ) * 100,
           2
